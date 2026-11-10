@@ -15,5 +15,5 @@
     "ioredis": "^6.0.0",
     "ws": "^8.17.1"
   },
-  "license": "MIT"
+  "license": "GPL-3.0"
 }
