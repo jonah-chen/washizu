@@ -34,6 +34,8 @@ r = ev('19m19p19s12345677z', '7z'); assert.strictEqual(r.yakuman, 1); assert.str
 // suuankou by tsumo; the same hand by ron on a shanpon wait is toitoi + sanankou
 r = ev('111m333p555s777m99s', '9s', { tsumo: true }); assert.strictEqual(r.yakuman, 1);
 r = ev('111m333p555s777m99s', '7m'); assert.strictEqual(r.yakuman, 0); assert.strictEqual(names(r), 'Sanankou,Toitoi');
+// suuankou needs tsumo: a ron on the pair of a fully closed toitoi hand is toitoi + sanankou
+r = ev('111m222p333s999m55p', '5p'); assert.strictEqual(r.yakuman, 0); assert.strictEqual(names(r), 'Sanankou,Toitoi'); assert.strictEqual(r.han, 4);
 // daisangen with open pons
 r = ev('123m99p555z', '9p', { melds: [{ type: 'pon', kind: 32 }, { type: 'pon', kind: 33 }] });
 assert.strictEqual(r.yakuman, 1);
@@ -52,4 +54,161 @@ assert.deepStrictEqual(M.waits(counts('23456m111p222s99p'), 0), K('147m'));
 assert.strictEqual(M.doraOf(8), 0); assert.strictEqual(M.doraOf(30), 27); assert.strictEqual(M.doraOf(33), 31);
 // limits
 assert.strictEqual(M.basePoints(4, 30, 0), 1920); assert.strictEqual(M.basePoints(4, 40, 0), 2000); assert.strictEqual(M.basePoints(11, 30, 0), 6000);
+
+// ---- multi-ron: of several ron on the same discard, only the one nearest the discarder in
+//      turn order wins; the rest get nothing ----
+const { Game } = require('../lib/game');
+const tiles = (k, n) => Array.from({ length: n }, (_, i) => k * 4 + i);
+// 111m 222p 333s 999m 5p: toitoi, waiting on 5p (ron -> sanankou, since suuankou needs tsumo)
+const winHand = () => [...tiles(0, 3), ...tiles(10, 3), ...tiles(20, 3), ...tiles(8, 3), ...tiles(13, 1)];
+const junkHand = () => [0, 1, 2, 11, 12, 19, 20, 21, 22, 23, 24, 25, 26].map(k => k * 4);
+// seat 0 discards 5p; seats 1 (d=1) and 3 (d=3) can both ron it
+const multiRon = resp => {
+  const g = new Game({ players: [0, 1, 2, 3].map(i => ({ key: 'p' + i, name: 'P' + i })), noTimers: true });
+  g.startHand();
+  const fiveP = 13 * 4 + 1;
+  g.hands[0] = junkHand(); g.hands[1] = winHand(); g.hands[2] = junkHand(); g.hands[3] = winHand();
+  g.lastDiscard = { seat: 0, id: fiveP };
+  g.dora = []; g.ura = [];                                          // no dora, so the score is deterministic
+  g.honba = 2; g.sticks = 1; g.scores[1] -= 1000;                 // seat 1 has declared riichi (paid the stick)
+  g.phase = 'claim';
+  g.pending = { type: 'discard', from: 0, id: fiveP, opts: { 1: { ron: true }, 3: { ron: true } }, resp };
+  g.resolve();
+  return g;
+};
+let g = multiRon({ 1: { c: 'ron' }, 3: { c: 'ron' } });           // both ron: seat 1 is nearest
+assert.strictEqual(g.result.type, 'ron');
+assert.strictEqual(g.result.winners.length, 1);
+assert.strictEqual(g.result.winners[0].seat, 1, 'the ron nearest the discarder wins');
+assert.strictEqual(g.result.winners[0].total, 8600);               // toitoi + sanankou, 4 han 60 fu -> mangan 2000 x4 + 2 honba x300
+assert.deepStrictEqual(g.result.deltas, [-8600, 9600, 0, 0]);      // +1000 riichi stick to the winner
+assert.strictEqual(g.sticks, 0);
+assert.strictEqual(g.scores.reduce((a, b) => a + b, 0), 100000, 'points conserved');
+assert.ok(g.tempFuriten[3], 'a multi-ron loser is treated as having let the win go');
+g = multiRon({ 1: { c: 'pass' }, 3: { c: 'ron' } });               // only the far seat rons: it wins
+assert.strictEqual(g.result.winners[0].seat, 3);
+assert.deepStrictEqual(g.result.deltas, [-8600, 0, 0, 9600]);
+assert.ok(g.tempFuriten[1], 'the nearer seat that let it go is furiten');
+
+// ---- the call wait: every discard pauses as if callers were deciding. When nobody can call
+//      the pause is a short random one that still shows the full play-time clock, so the
+//      timing never reveals that the tile was not wanted ----
+{
+  const gt = new Game({ players: [0, 1, 2, 3].map(i => ({ key: 'p' + i, name: 'P' + i })), turnMs: 30000 });
+  gt.startHand();
+  const oneZ = 27 * 4;                                  // 1z: nobody has one, so nobody can call
+  gt.hands[0] = [...junkHand(), oneZ];
+  gt.hands[1] = gt.hands[2] = gt.hands[3] = junkHand();
+  gt.drawn = oneZ; gt.computeOpts();
+  const t0 = Date.now();
+  gt.discard(0, oneZ, false);
+  assert.strictEqual(gt.phase, 'claim');
+  assert.strictEqual(Object.keys(gt.pending.opts).length, 0, 'no call is possible');
+  assert.ok(gt.fakeClaim);
+  assert.ok(gt.deadline - t0 >= 1000 && gt.deadline - t0 <= 3000, 'short random pause');
+  assert.ok(gt.view(1).deadline - Date.now() >= 29000, 'the clock still shows the full play time');
+  gt.timeout();
+  assert.strictEqual(gt.phase, 'action');
+  assert.strictEqual(gt.turn, 1, 'everyone is treated as having passed');
+
+  const g2 = new Game({ players: [0, 1, 2, 3].map(i => ({ key: 'p' + i, name: 'P' + i })), turnMs: 30000 });
+  g2.startHand();
+  const fourM = 3 * 4;                                  // 4m: seat 1 can chi it (2m 3m)
+  g2.hands[0] = [...junkHand(), fourM];
+  g2.hands[1] = g2.hands[2] = g2.hands[3] = junkHand();
+  g2.drawn = fourM; g2.computeOpts();
+  const t1 = Date.now();
+  g2.discard(0, fourM, false);
+  assert.strictEqual(g2.phase, 'claim');
+  assert.ok(!g2.fakeClaim);
+  assert.deepStrictEqual(Object.keys(g2.pending.opts), ['1'], 'only the chi caller is offered a call');
+  assert.ok(g2.deadline - t1 <= 30000 && g2.deadline - t1 >= 29000, 'a real claim gets the full play-time clock');
+  assert.strictEqual(g2.view(1).claim.chi.length, 1);
+  assert.ok(!g2.view(2).claim, 'the other seats get no call');
+
+  const gnt = new Game({ players: [0, 1, 2, 3].map(i => ({ key: 'p' + i, name: 'P' + i })), noTimers: true });
+  gnt.startHand();
+  gnt.hands[0] = [...junkHand(), oneZ];
+  gnt.hands[1] = gnt.hands[2] = gnt.hands[3] = junkHand();
+  gnt.drawn = oneZ; gnt.computeOpts();
+  gnt.discard(0, oneZ, false);
+  assert.strictEqual(gnt.phase, 'action', 'noTimers games skip the pause entirely');
+}
+
+// ---- call priority: a low-priority call waits for higher-priority callers to call or pass;
+//      the highest available call stands at once; at equal priority the nearer seat wins ----
+const chiPonOpts = { 1: { chi: [[2 * 4, 3 * 4]] }, 2: { pon: [4 * 4, 4 * 4 + 1] } };  // seat 1 (d=1) chis, seat 2 (d=2) pons 5m
+const prio = opts => {
+  const g = new Game({ players: [0, 1, 2, 3].map(i => ({ key: 'p' + i, name: 'P' + i })), noTimers: true });
+  g.startHand();
+  g.hands[0] = [...junkHand(), 4 * 4];
+  g.hands[1] = [8, 12, 0, 1, 2, 40, 41, 42, 50, 51, 52, 60, 61];          // the 3m 4m for the chi
+  g.hands[2] = [16, 17, 0, 1, 2, 40, 41, 42, 50, 51, 52, 96, 100];        // two 5m for the pon
+  g.hands[3] = junkHand();
+  g.ponds[0] = [{ id: 4 * 4 }];                                 // the (simulated) discard
+  g.phase = 'claim';
+  g.pending = { type: 'discard', from: 0, id: 4 * 4, opts, resp: {} };
+  return g;
+};
+{
+  let g = prio(chiPonOpts);
+  assert.strictEqual(g.claim(1, 'chi', 0), undefined);
+  assert.strictEqual(g.phase, 'claim', 'a chi waits for the pon to call or pass');
+  assert.strictEqual(g.claim(2, 'pass'), undefined);
+  assert.strictEqual(g.phase, 'action', 'the pon passed, so the chi stands');
+  assert.strictEqual(g.turn, 1);
+  assert.strictEqual(g.melds[1][0].type, 'chi');
+
+  g = prio(chiPonOpts);
+  assert.strictEqual(g.claim(2, 'pon'), undefined);
+  assert.strictEqual(g.phase, 'action', 'the pon is the highest available call: it stands at once');
+  assert.strictEqual(g.turn, 2);
+  assert.strictEqual(g.melds[2][0].type, 'pon');
+  assert.strictEqual(g.melds[1].length, 0, 'the still-waiting chi gets nothing');
+
+  g = prio(chiPonOpts);
+  g.claim(1, 'chi', 0);
+  assert.strictEqual(g.claim(2, 'pon'), undefined);
+  assert.strictEqual(g.turn, 2, 'a higher-priority call overrides a pending lower one');
+  assert.strictEqual(g.melds[2][0].type, 'pon');
+
+  const ponPonOpts = { 1: { pon: [16, 17] }, 3: { pon: [18, 19] } };
+  g = prio(ponPonOpts);
+  g.hands[3] = [18, 19, 0, 1, 2, 40, 41, 42, 50, 51, 52, 96, 104];
+  assert.strictEqual(g.claim(3, 'pon'), undefined);
+  assert.strictEqual(g.phase, 'claim', 'the farther pon waits for the nearer seat to call or pass');
+  assert.strictEqual(g.claim(1, 'pass'), undefined);
+  assert.strictEqual(g.phase, 'action', 'the nearer seat passed, so the farther pon stands');
+  assert.strictEqual(g.turn, 3);
+  assert.strictEqual(g.melds[3][0].type, 'pon');
+
+  const gr = new Game({ players: [0, 1, 2, 3].map(i => ({ key: 'p' + i, name: 'P' + i })), noTimers: true });
+  gr.startHand();
+  gr.hands[0] = [...junkHand(), 13 * 4 + 1];
+  gr.hands[1] = winHand();                                             // toitoi, waiting on 5p
+  gr.hands[2] = [54, 55, 0, 1, 2, 44, 48, 76, 80, 84, 88, 92, 96];      // two 5p for a pon
+  gr.hands[3] = junkHand();
+  gr.dora = []; gr.ura = [];
+  gr.phase = 'claim';
+  gr.pending = { type: 'discard', from: 0, id: 13 * 4 + 1, opts: { 1: { ron: true }, 2: { pon: [54, 55] } }, resp: {} };
+  assert.strictEqual(gr.claim(1, 'ron'), undefined);
+  assert.strictEqual(gr.result.type, 'ron', 'the ron is the highest available call: it stands at once');
+  assert.strictEqual(gr.result.winners[0].seat, 1);
+}
+
+// ---- no West or North rounds: a hanchan is an East + South cycle, repeated for the length ----
+const g3 = new Game({ players: [0, 1, 2, 3].map(i => ({ key: 'p' + i, name: 'P' + i })), length: 'hanchan2', noTimers: true });
+g3.startHand();
+const rounds = [];
+for (let h = 0; h < 16; h++) {                                       // 2 hanchan x 2 rounds x 4 kyoku
+  const v = g3.view(1);
+  rounds.push([v.roundWind, v.hanchan]);
+  g3.result = { type: 'draw', deltas: [0, 0, 0, 0], winners: [] };
+  g3.next();
+}
+assert.deepStrictEqual(rounds,
+  [[0, 1], [0, 1], [0, 1], [0, 1], [1, 1], [1, 1], [1, 1], [1, 1],
+   [0, 2], [0, 2], [0, 2], [0, 2], [1, 2], [1, 2], [1, 2], [1, 2]]); // East, South, then East, South again
+assert.strictEqual(g3.phase, 'over');
+assert.deepStrictEqual(g3.scores, [85000, 45000, 5000, -35000]);     // two settlements of +30000/+10000/-10000/-30000
 console.log('engine tests passed');

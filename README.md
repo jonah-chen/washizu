@@ -1,10 +1,36 @@
-# Glass Mahjong
+# Washizu Mahjong (와시즈 마작)
 
-Online Washizu-style riichi mahjong, two against two, for exactly four human players. No bots.
+Online riichi mahjong under the special rules Washizu Iwao invented in Nobuyuki
+Fukumoto's *Akagi: Yami ni Oritatta Tensai* —
+[the story and the rules](https://en.namu.wiki/w/%EC%99%80%EC%8B%9C%EC%A6%88%20%EB%A7%88%EC%9E%91) —
+played two against two, for exactly four human players. No bots.
 
-Three of the four copies of every tile are glass and visible to the whole table,
-wherever they are. The fourth copy is solid and shows only its back in a hand.
-Tiles are drawn at random from a bag. Everything else is standard riichi mahjong.
+In the story the game sits down to be played by four fixed roles — **Akagi** and
+**Yasuoka** against **Washizu** and **Suzuki** — and it is riichi mahjong with two
+perversions of the ordinary rules:
+
+**Crystal tiles.** Three of the four copies of every tile are made of transparent
+glass, visible to the whole table wherever they are — in your hand, in anyone's pond,
+in a meld. The fourth copy is solid and shows only its back in a hand. In the prequel
+*Washizu: Enma no Tōpa* the set is ground by Washizu himself from melted glass: the
+whole table can be read, and "precisely for that reason the opponent is bound so
+tightly that not a single move can be made."
+
+**The hole.** There is no wall to track. The 136 tiles are machine-shuffled into a
+hole in the middle of a special table and drawn one at a time, with leather gloves so
+nobody can feel the tiles; the dora indicator is drawn from the hole before the deal,
+and a hand ends in a draw when all players' discards total 70. Here the hole is
+simulated as a bag: every draw is uniformly random.
+
+**The stakes.** In the story Washizu puts up **20 million yen** (100,000 yen per 100
+points) and his challengers put up **their own blood** — 2,000cc, the "vampire rules" —
+which is why playing safe is not an option: shrinking away means bleeding out through
+tenpai payments and the score difference. That part is not implemented here: this
+version plays for points only, nobody is "out", and the match is decided by the duel
+between the two geniuses, as in the story. The story's match is said to have lasted
+21 years; the longest game here is about 4½ hours.
+
+Everything else is standard riichi mahjong.
 
 This version runs on Vercel. It also still runs on your own machine with one command.
 
@@ -76,18 +102,23 @@ normal and private windows in two browsers) and make one account in each.
 `REDIS_URL=redis://localhost:6379 npm run test:redis` plays a full game across two server
 instances that share only that Redis, including a player switching instance mid-game.
 
-## Teams
+## Roles and teams
 
-- A table has two teams of two. In the waiting room each player picks a side by
-  taking an open seat under Team 1 or Team 2.
-- Partners sit opposite each other. Which pair gets the first deal, and the order
-  within each pair, is drawn at random.
+- Each seat is a fixed role, in play order: 0 Akagi, 1 Yasuoka, 2 Washizu, 3 Suzuki.
+  In the waiting room a player picks their role by taking the seat; Akagi deals first.
+- Teams are the adjacent pairs: Akagi & Yasuoka against Washizu & Suzuki.
 - Every player scores as in ordinary riichi mahjong, starting on 25,000. A team's
-  total is the sum of its two players, and the higher total wins. Equal totals are a drawn game.
+  total is the sum of its two players.
+- When the game ends, Akagi & Yasuoka win if Akagi has more points than Washizu;
+  otherwise Washizu & Suzuki win. A tie goes to Washizu & Suzuki, so there are no
+  drawn games.
+- Except in East-only games, the places are settled at the end of every hanchan:
+  1st to 4th are paid +30,000, +10,000, −10,000, −30,000 (20,000 apart, zero-sum).
+- Nobody is out for going negative.
 - Partners cannot see each other's solid tiles. Winning off your partner's discard
   is allowed, which moves points inside the team and ends the hand.
 - A win moves rating from the losing pair to the winning pair, more for a bigger margin.
-- After a game, "Play again" keeps the teams and "Change teams" returns everyone to seating.
+- After a game, "Play again" keeps the roles and "Change roles" returns everyone to seating.
 
 ## How hidden information is kept hidden
 
@@ -117,17 +148,26 @@ All keys in Redis start with `gm:`, so the database can be shared with other app
 
 ## Rules implemented
 
-- 136 tiles, no red fives. 25,000 starting points. East-only or East plus South games.
+- 136 tiles, no red fives. 25,000 starting points. Games can be East-only, East plus South,
+  or 2, 4 or 6 hanchan. A hanchan is an East round followed by a South round: there are no
+  West or North rounds, so a 2-hanchan game plays East, South, East, South.
 - 70 draws per hand from the bag; kan replacement draws count against the 70.
 - Chi, pon, open kan, closed kan, added kan (with chankan), riichi, double riichi, ippatsu.
 - Dora, kan dora (revealed immediately), ura dora.
 - Furiten: discard, temporary and riichi furiten. No swap-calling (kuikae).
-- Multiple ron is allowed; repeat counters and riichi sticks go to the winner nearest the discarder.
+- If several players ron the same discard, only the one nearest the discarder in turn
+  order wins; the others get nothing. Repeat counters and riichi sticks go to the winner.
+- After every discard the table pauses as if callers were deciding: the clock is the full
+  turn time, and when no call is possible the pause is a short random moment with everyone
+  treated as having passed, so the timing never reveals whether the tile was wanted.
+- A call stands as soon as nobody still waiting can outrank it: ron beats pon and kan, which
+  beat chi, and at equal priority the seat nearer the discarder in turn order wins, so the
+  highest available call is processed at once.
 - All standard yaku and yakuman, open tanyao allowed. Counted yakuman at 13 han.
 - Exhaustive draw with tenpai payments. Dealer repeats on a win or when tenpai at a draw.
-- The game ends after the last round, when any player drops below zero, or when the
-  last dealer wins while their team is ahead.
+- The game ends after the last hanchan of the chosen length. There is no early end for a
+  negative score, and the winner is the Akagi-vs-Washizu comparison, never a draw.
 - When a call is possible, glass tiles are used for the meld first, so your solid tiles stay in hand.
 
-Not implemented: abortive draws, nagashi mangan, liability payments (pao),
-robbing a closed kan for thirteen orphans, and the West-round extension.
+Not implemented: abortive draws, nagashi mangan, liability payments (pao), and robbing a
+closed kan for thirteen orphans.

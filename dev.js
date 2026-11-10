@@ -4,4 +4,4 @@
 const { createApp } = require('./lib/app');
 const PORT = +process.env.PORT || 3000;
 const app = createApp();
-app.server.listen(PORT, () => console.log(`Glass Mahjong on http://localhost:${PORT} (${app.store.kind} store)`));
+app.server.listen(PORT, () => console.log(`Washizu Mahjong on http://localhost:${PORT} (${app.store.kind} store)`));

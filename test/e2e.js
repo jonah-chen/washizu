@@ -87,7 +87,7 @@ const until = async (fn, what, ms = 5000) => { const end = Date.now() + ms; whil
   await until(() => state.every(s => s.lobby), 'lobby on every socket');
 
   // ---- lobby and seating across instances ----
-  say(0, { t: 'create', name: '<b>Test</b>', length: 'east', turnSec: 15 });
+  say(0, { t: 'create', name: '<b>Test</b>', length: 'east', turnSec: 15, fakeWait: [20, 60] });   // fakeWait: keep the test fast
   await until(() => state[1].lobby.tables.some(t => t.name === '<b>Test</b>') && state[0].table, 'table to appear in the other instance\'s lobby');
   const id = state[1].lobby.tables.find(t => t.name === '<b>Test</b>').id;
   for (const i of [1, 2, 3]) { say(i, { t: 'join', id }); await until(() => state[i].table, 'join ' + i); }
@@ -99,7 +99,7 @@ const until = async (fn, what, ms = 5000) => { const end = Date.now() + ms; whil
   say(3, { t: 'seat', i: 0 }); await until(() => state[1].table.seats[0] && state[1].table.seats[0].name === N[3], 'Dave moved');
   say(0, { t: 'join', id }); await until(() => state[0].table && state[2].table.seats.every(Boolean), 'Alice rejoined');
   assert.deepStrictEqual(state[2].table.seats.map(s => s.name), [N[3], N[1], N[2], N[0]]);
-  const teamOf = { [N[3]]: 'A', [N[2]]: 'A', [N[1]]: 'B', [N[0]]: 'B' };
+  const teamOf = { [N[3]]: 'A', [N[1]]: 'A', [N[2]]: 'B', [N[0]]: 'B' };   // teammates sit side by side: seats 0+1 and 2+3
   say(0, { t: 'chat', text: 'good luck' });
   await until(() => state[3].table.chat.length === 1, 'chat crosses instances');
   for (const i of [0, 1, 2]) say(i, { t: 'ready', v: true });
@@ -108,8 +108,9 @@ const until = async (fn, what, ms = 5000) => { const end = Date.now() + ms; whil
   say(3, { t: 'ready', v: true });
   await until(() => state.every(s => s.game), 'game start on all four sockets');
   const names = state[0].game.players.map(p => p.name);
-  for (const s of [0, 1]) assert.strictEqual(teamOf[names[s]], teamOf[names[s + 2]]);
-  assert.notStrictEqual(teamOf[names[0]], teamOf[names[1]]);
+  assert.strictEqual(teamOf[names[0]], teamOf[names[1]]);
+  assert.strictEqual(teamOf[names[2]], teamOf[names[3]]);
+  assert.notStrictEqual(teamOf[names[0]], teamOf[names[2]]);
   say(0, { t: 'leave' });
   await until(() => state[0].errs.some(e => /in progress/.test(e)), 'cannot leave mid-game');
 
@@ -131,12 +132,13 @@ const until = async (fn, what, ms = 5000) => { const end = Date.now() + ms; whil
   assert.strictEqual(final.final.teams.length, 2);
   for (const t of final.final.teams) assert.strictEqual(teamOf[t.members[0].name], teamOf[t.members[1].name]);
   assert.ok(!JSON.stringify(final.final).includes('"key"'), 'account keys are not sent to clients');
+  assert.ok(final.final.winner === 0 || final.final.winner === 1, 'there are no drawn games');
+  assert.strictEqual(final.final.winner, final.final.decider[0] > final.final.decider[1] ? 0 : 1, 'winner is the Akagi-vs-Washizu comparison');
   await wait(300);
   const lb = (await get(1, 'leaderboard')).top.filter(u => N.includes(u.name));
   assert.strictEqual(lb.length, 4);
-  const drawn = final.final.winner == null;
   assert.strictEqual(lb.reduce((a, u) => a + u.stats.games, 0), 4);
-  assert.strictEqual(lb.reduce((a, u) => a + u.stats.wins, 0), drawn ? 0 : 2);
+  assert.strictEqual(lb.reduce((a, u) => a + u.stats.wins, 0), 2, 'one team wins, so exactly two players win');
   assert.strictEqual(lb.reduce((a, u) => a + u.stats.rating, 0), 6000, 'rating is zero-sum');
   say(1, { t: 'regroup' }); await until(() => state[2].game === null && state[2].table, 'change teams returns everyone to seating');
   for (const i of [0, 1, 2, 3]) { say(i, { t: 'leave' }); await until(() => state[i].table === null, 'leave ' + i); }

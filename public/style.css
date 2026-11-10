@@ -30,17 +30,14 @@ label>input,label>select{margin-top:.3rem;color:var(--bone);font-size:1rem}
 #toast.show{opacity:1}
 
 /* ---------- tiles ---------- */
-.tile{--w:var(--tw);width:var(--w);height:calc(var(--w)*1.36);border-radius:calc(var(--w)*.13);display:inline-flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--display);line-height:1;position:relative;flex:none;user-select:none;padding:0;border:0;margin:0}
-.tile b{font-size:calc(var(--w)*.56);font-weight:800}
-.tile i{font-style:normal;font-size:calc(var(--w)*.3);margin-top:calc(var(--w)*.05);font-weight:700}
-.tile b.hz{font-size:calc(var(--w)*.66)}
-.tile.solid,.tile.back{background:linear-gradient(#f5eedb,#dfd4b8);color:#1d1b18;box-shadow:0 calc(var(--w)*.07) 0 #a99c7c,0 calc(var(--w)*.14) calc(var(--w)*.22) rgba(0,0,0,.4)}
-.tile.back{background:linear-gradient(#e9dfc6,#cfc3a3)}
-.tile.glass{background:linear-gradient(155deg,rgba(214,246,240,.28),rgba(150,214,206,.07) 60%,rgba(214,246,240,.16));border:1px solid rgba(214,246,240,.6);color:#effffb;box-shadow:inset 0 0 calc(var(--w)*.3) rgba(190,250,240,.1)}
-.solid.s-m{color:#b0271e}.solid.s-p{color:#1b4c8f}.solid.s-s{color:#17703c}
-.solid.h4{color:#8d8878}.solid.h5{color:#17703c}.solid.h6{color:#b0271e}
-.glass.s-m{color:#ff9d91}.glass.s-p{color:#93ccff}.glass.s-s{color:#8be6aa}
-.glass.h4{color:#c9d9d5}.glass.h5{color:#8be6aa}.glass.h6{color:#ff9d91}
+/* The tile body is the .tile box itself: opaque ivory for solid tiles, transparent for glass ones.
+   The face art (public/tiles/*.svg) sits on top and stays fully opaque in both cases. */
+.tile{--w:var(--tw);width:var(--w);height:calc(var(--w)*1.33);border-radius:calc(var(--w)*.13);display:inline-flex;align-items:center;justify-content:center;position:relative;flex:none;user-select:none;padding:0;border:0;margin:0}
+.tile img.face{width:100%;height:100%;display:block;object-fit:contain;pointer-events:none}
+.tile.solid,.tile.back{box-shadow:0 calc(var(--w)*.07) 0 #a99c7c,0 calc(var(--w)*.14) calc(var(--w)*.22) rgba(0,0,0,.4)}
+.tile.solid{background:linear-gradient(#f5eedb,#dfd4b8)}
+.tile.back{background:none}
+.tile.glass{background:linear-gradient(155deg,rgba(214,246,240,.28),rgba(150,214,206,.07) 60%,rgba(214,246,240,.16));border:1px solid rgba(214,246,240,.6);box-shadow:inset 0 0 calc(var(--w)*.3) rgba(190,250,240,.1)}
 .tile.side{transform:rotate(90deg);margin:0 calc(var(--w)*.19)}
 .tile.dim{opacity:.4}
 .tile.gone{opacity:.32}
@@ -98,6 +95,8 @@ button.tile:disabled{cursor:default}
 .seat.open .btn{margin-top:8px}
 .pip.gap{margin-left:6px}
 .tag.partner{border-color:var(--ally);color:var(--ally)}
+.tag.role{font-weight:700}
+.tag.role.r0{border-color:var(--ally);color:var(--ally)}
 .opp.ally{border-left:3px solid var(--ally)}
 .deltas .ours{border-color:var(--ally)}
 .teamline{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
@@ -135,7 +134,7 @@ button.tile:disabled{cursor:default}
 .tag.riichi{border-color:var(--brass);color:var(--brass)}
 .tag.warn{border-color:#ffb4a8;color:#ffb4a8}
 .ohand{min-height:calc(var(--tw)*1.5)}
-.pond{margin-top:10px;display:grid;grid-template-columns:repeat(6,max-content);gap:3px;min-height:calc(var(--tw)*1.36*2 + 3px);--tw:23px;align-content:start}
+.pond{margin-top:10px;display:grid;grid-template-columns:repeat(6,max-content);gap:3px;min-height:calc(var(--tw)*1.33*2 + 3px);--tw:23px;align-content:start}
 .pond .tile.side{margin:0;transform:none;outline:1px solid var(--brass)}
 .flash{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;font-family:var(--display);font-weight:800;font-size:2.4rem;color:#fff;text-shadow:0 2px 18px rgba(0,0,0,.8);background:rgba(197,57,44,.28);border-radius:8px;animation:flash 1.3s forwards}
 @keyframes flash{0%{opacity:0;transform:scale(1.15)}15%{opacity:1;transform:none}75%{opacity:1}100%{opacity:0}}
@@ -177,7 +176,7 @@ button.tile:disabled{cursor:default}
   :root{--tw:clamp(21px,6.3vw,40px)}
   .gamewrap{padding:8px}
   .opps{grid-template-columns:1fr}
-    .pond{--tw:20px;grid-template-columns:repeat(12,max-content);min-height:calc(var(--tw)*1.36)}
+    .pond{--tw:20px;grid-template-columns:repeat(12,max-content);min-height:calc(var(--tw)*1.33)}
   .mid{grid-template-columns:1fr}
   .mine .pond{--tw:24px;grid-template-columns:repeat(9,max-content)}
   .deltas{grid-template-columns:repeat(2,1fr)}

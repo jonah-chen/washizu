@@ -17,7 +17,7 @@ delete process.env.REDIS_URL; delete process.env.KV_URL;
   assert.ok(/REDIS_URL/.test((await r.json()).error));
   const page = await fetch(base + '/');
   assert.strictEqual(page.status, 200);
-  assert.ok((await page.text()).includes('Glass Mahjong'));
+  assert.ok((await page.text()).includes('Washizu Mahjong'));
   console.log('entry point test passed');
   process.exit(0);
 })().catch(e => { console.error(e); process.exit(1); });
