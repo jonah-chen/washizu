@@ -11,7 +11,8 @@ This version runs on Vercel. It also still runs on your own machine with one com
 ## Deploy to Vercel
 
 1. Put this folder in a Git repository and import it at vercel.com/new, or run `vercel` in it.
-   Framework preset: **Other**. Leave the build command and output directory empty.
+   Leave the build command and output directory empty. Vercel finds `server.mjs` at the
+   project root (named in `package.json` as `main`) and runs it as the backend.
 2. In the project, open **Storage**, create a **Redis** database from the Marketplace and
    connect it to the project.
 3. Open **Settings → Environment Variables** and check that `REDIS_URL` (or `KV_URL`) exists
@@ -28,9 +29,9 @@ If the database is missing, the login form says so instead of failing silently.
 ### What Vercel changes about how the game runs
 
 - **Connections are cut every five minutes.** A WebSocket closes when the function reaches
-  its maximum duration (300 seconds on Hobby). The browser reconnects within a fraction
+  its maximum duration (300 seconds by default). The browser reconnects within a fraction
   of a second and anything clicked in the gap is sent once it is back. Players do not
-  see this. On Pro you can raise `maxDuration` in `vercel.json` to 800.
+  see this. On Pro you can raise the limit under Settings → Functions.
 - **Any instance can serve any player.** Nothing important is kept in memory. Each action
   loads the table from Redis, applies the move under a lock, saves it, and publishes the
   result; every instance forwards it to the sockets it holds.
@@ -62,14 +63,13 @@ normal and private windows in two browsers) and make one account in each.
 
 | Path | What it does |
 | --- | --- |
-| `api/server.js` | Vercel entry point: exports the server for the platform to drive |
+| `server.mjs` | Vercel entry point: exports the server for the platform to drive |
 | `dev.js` | Local entry point: the same server, listening on a port |
 | `lib/app.js` | HTTP API, accounts and sessions, lobby, tables, chat, WebSocket handling |
 | `lib/store.js` | Shared state: Redis when `REDIS_URL` is set, in-memory otherwise |
 | `lib/game.js` | Game state machine: dealing, turns, calls, riichi, furiten, round flow, deadlines |
 | `lib/mahjong.js` | Hand shapes, waits, yaku, fu and point calculation |
 | `public/` | The browser client (plain HTML, CSS and JavaScript, no build step) |
-| `vercel.json` | Sets the function's maximum duration |
 | `test/` | Scoring tests, a full-game simulation, an entry-point check, and an end-to-end test |
 
 `npm test` runs everything against the in-memory store. With a Redis server running,
