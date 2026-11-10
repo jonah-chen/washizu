@@ -23,8 +23,8 @@ and a hand ends in a draw when all players' discards total 70. Here the hole is
 simulated as a bag: every draw is uniformly random.
 
 **The stakes.** In the story Washizu puts up **20 million yen** (100,000 yen per 100
-points) and his challengers put up **their own blood** — 2,000cc, the "vampire rules" —
-which is why playing safe is not an option: shrinking away means bleeding out through
+points), and Akagi stakes **his own blood** — 2,000cc, the "vampire rules" — which is
+why playing safe is not an option for him: shrinking away means bleeding out through
 tenpai payments and the score difference. That part is not implemented here: this
 version plays for points only, nobody is "out", and the match is decided by the duel
 between the two geniuses, as in the story. The story's match is said to have lasted
@@ -171,3 +171,9 @@ All keys in Redis start with `gm:`, so the database can be shared with other app
 
 Not implemented: abortive draws, nagashi mangan, liability payments (pao), and robbing a
 closed kan for thirteen orphans.
+
+## Credit
+
+The tile faces are [riichi-mahjong-tiles](https://github.com/FluffyStuff/riichi-mahjong-tiles)
+by [FluffyStuff](https://github.com/FluffyStuff). The repository's assets are in the public
+domain ([CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/)).
