@@ -9,6 +9,9 @@ const SUIT = ['characters', 'circles', 'bamboo'], HON = ['East wind', 'South win
 const ROLE = ['Akagi', 'Yasuoka', 'Washizu', 'Suzuki'];
 const TEAM = ['Akagi & Yasuoka', 'Washizu & Suzuki'];
 const LEN = { east: 'East round only', south: 'East and South', hanchan2: '2 hanchan', hanchan4: '4 hanchan', hanchan6: '6 hanchan' };
+// In team games the fixed role is a player's identity, shown at full size, with the account
+// name as a smaller label after it. Free-for-all has no roles, so the account name stands alone.
+const who = (p, s, mode) => mode === 'ffa' ? esc(p.name) : `${ROLE[s]} <span class="un">${esc(p.name)}</span>`;
 
 const S = {
   me: null, lobby: { tables: [], online: 0 }, table: null, game: null, board: [],
@@ -158,6 +161,7 @@ const shells = {
       <section><h2>Start a table</h2>
         <form id="createform" class="card">
           <label>Table name<input type="text" id="tn" maxlength="30" placeholder="Optional"></label>
+          <label>Mode<select id="tm"><option value="team" selected>Two against two</option><option value="ffa">Free-for-all</option></select></label>
           <label>Length<select id="tl"><option value="east">East round only (about 20 minutes)</option><option value="south">East and South (about 45 minutes)</option><option value="hanchan2">2 hanchan (about 90 minutes)</option><option value="hanchan4">4 hanchan (about 3 hours)</option><option value="hanchan6">6 hanchan (about 4½ hours)</option></select></label>
           <label>Time per turn<select id="tt"><option value="15">15 seconds</option><option value="30" selected>30 seconds</option><option value="60">60 seconds</option></select></label>
           <button class="btn primary">Create table</button>
@@ -168,13 +172,14 @@ const shells = {
       <section class="rules"><h2>The story and the rules</h2>
         <p class="muted">Washizu Mahjong (와시즈 마작) is the special riichi game Washizu Iwao invented in Nobuyuki Fukumoto's <i>Akagi</i>. Washizu is the "king of the gambling world," whose left hand is said to be godlike and never to lose — and this game is the one he set, on his own house rules, for the greatest gambler in the country. <b>Washizu and Suzuki</b> play against <b>Akagi and Yasuoka</b>, over crystal tiles.</p>
         <p class="muted">Washizu stakes 20 million yen; Akagi stakes his own blood — 2,000cc, the "vampire rules" — so the more he loses, the more he bleeds, and playing it safe is no shelter. This table plays the mahjong only: no money, no blood, just points. The story's match is said to have lasted 21 years. <a href="https://en.namu.wiki/w/%EC%99%80%EC%8B%9C%EC%A6%88%20%EB%A7%88%EC%9E%91" target="_blank" rel="noopener">The story and its rules</a>.</p>
-        <details open><summary>The rules, in seven lines</summary><ul>
+        <details open><summary>The rules, in eight lines</summary><ul>
           <li><strong>Crystal tiles.</strong> Each tile has four copies: three are transparent crystal — visible to the whole table, in your hand and in everyone else's — and the fourth is solid, showing only its back in a hand. Washizu ground the crystal set himself: every tile can be read, and that is exactly what binds you.</li>
           <li><strong>The hole.</strong> There is no wall to track. The 136 tiles are machine-shuffled and drawn at random, one at a time, from a bag standing in for the hole in the middle of the story's table. A hand ends in a draw after 70 draws.</li>
           <li><strong>Everything else is riichi mahjong.</strong> You need a yaku to win. Riichi, ippatsu, dora, ura dora, kan dora and furiten all apply. Open tanyao is allowed.</li>
-          <li><strong>The seats.</strong> Four fixed roles, played in the order Akagi → Yasuoka → Washizu → Suzuki. Akagi &amp; Yasuoka play against Washizu &amp; Suzuki, and you pick your role by taking its seat. You cannot see your partner's solid tiles, and you may win off your partner's discard.</li>
-          <li><strong>Winning.</strong> Everyone scores as usual from 25,000 and nobody is out for going negative. When the game ends, the match belongs to whichever of Akagi and Washizu has more points — the duel between the two geniuses decides it (a tie goes to Washizu's side). If several players can ron the same discard, only the one nearest the discarder in turn order wins; the others get nothing.</li>
-          <li><strong>Lengths and hanchan scoring.</strong> East round only, East and South, or 2, 4 or 6 hanchan — a hanchan is an East round followed by a South round, and there are no West or North rounds. The longest game here is about 4½ hours. Except in East-only games, at the end of each hanchan the places are paid as in the story: +30,000, +10,000, −10,000, −30,000 for 1st to 4th.</li>
+          <li><strong>The seats.</strong> Four fixed roles, played in the order Akagi → Yasuoka → Washizu → Suzuki, and you pick your role by taking its seat. In two-against-two games Akagi &amp; Yasuoka play against Washizu &amp; Suzuki; you cannot see your partner's solid tiles, and you may win off your partner's discard.</li>
+          <li><strong>The modes.</strong> When starting a table you choose two-against-two — the story's match — or free-for-all, where everyone plays for themselves. In free-for-all there are no hanchan settlements and the game ends after its last hand; the highest total wins, a tie going to the lower seat, so there are no drawn games.</li>
+          <li><strong>Winning.</strong> Everyone scores as usual from 25,000 and nobody is out for going negative. In two-against-two, when the game ends the match belongs to whichever of Akagi and Washizu has more points — the duel between the two geniuses decides it (a tie goes to Washizu's side). If several players can ron the same discard, only the one nearest the discarder in turn order wins; the others get nothing.</li>
+          <li><strong>Lengths and hanchan scoring.</strong> East round only, East and South, or 2, 4 or 6 hanchan — a hanchan is an East round followed by a South round, and there are no West or North rounds. The longest game here is about 4½ hours. In two-against-two, except in East-only games, at the end of each hanchan the places are paid as in the story: +30,000, +10,000, −10,000, −30,000 for 1st to 4th.</li>
           <li><strong>Clock.</strong> If your time runs out, the tile you drew is discarded and calls are passed.</li>
         </ul></details></section>
     </div></main>`,
@@ -199,14 +204,21 @@ function side(t, team) {
   return n.length === 2 ? n.join(' and ') : n.length === 1 ? `${n[0]} and an open seat` : 'two open seats';
 }
 
+// The top two players by score, e.g. "Mei 34,000 vs Ryo 25,000". Ties go to the lower seat,
+// so this always names exactly two players.
+function leaders(P) {
+  const o = [0, 1, 2, 3].sort((a, b) => P[b].score - P[a].score || a - b);
+  return `${esc(P[o[0]].name)} ${P[o[0]].score.toLocaleString()} vs ${esc(P[o[1]].name)} ${P[o[1]].score.toLocaleString()}`;
+}
+
 function drawLobby() {
   const L = S.lobby, st = S.me.stats;
   $('#online').textContent = `${L.online} online`;
   $('#whoami').textContent = S.me.name;
   $('#tables').innerHTML = L.tables.length ? L.tables.map(t => `<div class="trow">
       <div class="pips" aria-label="${t.seats.filter(Boolean).length} of 4 seats taken">${[0, 1, 2, 3].map(i => `<span class="pip ${t.seats[i] ? 'full' : ''} ${i === 1 ? 'gap' : ''}" title="${ROLE[i]}"></span>`).join('')}</div>
-      <div class="grow"><div class="tname">${esc(t.name)}</div><div class="who">${LEN[t.length] || LEN.east}, ${t.turnSec}s turns. ${esc(TEAM[0])} (${side(t, 0)}) against ${esc(TEAM[1])} (${side(t, 1)})</div></div>
-      ${t.playing ? '<span class="tag">In play</span>' : t.seats.every(Boolean) ? '<span class="tag">Full</span>' : `<button class="btn small" data-act="join" data-table="${t.id}">Take a seat</button>`}
+      <div class="grow"><div class="tname">${esc(t.name)}</div><div class="who">${LEN[t.length] || LEN.east}, ${t.turnSec}s turns. ${t.mode === 'ffa' ? 'Free-for-all: each player for themselves' : `${esc(TEAM[0])} (${side(t, 0)}) against ${esc(TEAM[1])} (${side(t, 1)})`}</div></div>
+      ${t.mode === 'ffa' ? '<span class="tag">Free-for-all</span>' : ''}${t.playing ? '<span class="tag">In play</span>' : t.seats.every(Boolean) ? '<span class="tag">Full</span>' : `<button class="btn small" data-act="join" data-table="${t.id}">Take a seat</button>`}
     </div>`).join('') : '<p class="empty">No tables are open. Start one below and three more players can join it.</p>';
   $('#record').innerHTML = st.games ? `<dl class="facts"><dt>Rating</dt><dd>${st.rating}</dd><dt>Games</dt><dd>${st.games}</dd>
       <dt>Wins</dt><dd>${st.wins}</dd></dl>` : `<p class="muted">Rating ${st.rating}. Finish a game to start your record.</p>`;
@@ -219,11 +231,13 @@ function drawRoom() {
   const t = S.table, mine = t.seats.find(s => s && s.name === S.me.name);
   const n = t.seats.filter(Boolean).length;
   $('#rname').textContent = t.name;
-  $('#rmeta').textContent = `${LEN[t.length] || LEN.east}, ${t.turnSec} seconds per turn. Each seat is a fixed role: ${TEAM[0]} team up, and so do ${TEAM[1]}. Turns go Akagi, Yasuoka, Washizu, Suzuki; Akagi deals first.`;
+  const ffa = t.mode === 'ffa';
+  $('#rmeta').textContent = `${LEN[t.length] || LEN.east}, ${t.turnSec} seconds per turn. ${ffa ? 'Free-for-all: everyone plays for themselves, and the highest total at the end wins.' : `Each seat is a fixed role: ${TEAM[0]} team up, and so do ${TEAM[1]}.`} Turns go Akagi, Yasuoka, Washizu, Suzuki; Akagi deals first.`;
   const seat = i => { const s = t.seats[i], part = s ? t.seats[i ^ 1] : null; return s
-    ? `<div class="seat ${s.ready ? 'rdy' : ''}"><div class="sn">${esc(s.name)}${s.name === S.me.name ? ' (you)' : ''}</div><div class="ss">${!s.online ? 'Disconnected' : s.ready ? 'Ready' : 'Not ready'} · ${ROLE[i]}${part ? `, partner ${esc(part.name)}` : ''}</div></div>`
+    ? `<div class="seat ${s.ready ? 'rdy' : ''}"><div class="sn">${esc(s.name)}${s.name === S.me.name ? ' (you)' : ''}</div><div class="ss">${!s.online ? 'Disconnected' : s.ready ? 'Ready' : 'Not ready'} · ${ROLE[i]}${part && !ffa ? `, partner ${esc(part.name)}` : ''}</div></div>`
     : `<div class="seat open"><div class="sn">${ROLE[i]}</div><button class="btn small" data-act="seat" data-i="${i}">Play as ${ROLE[i]}</button></div>`; };
-  $('#seats').innerHTML = [0, 1].map(team => `<div class="team"><h3>${esc(TEAM[team])}</h3>${seat(team * 2)}${seat(team * 2 + 1)}</div>`).join('');
+  $('#seats').innerHTML = ffa ? `<div class="team">${[0, 1, 2, 3].map(seat).join('')}</div>`
+    : [0, 1].map(team => `<div class="team"><h3>${esc(TEAM[team])}</h3>${seat(team * 2)}${seat(team * 2 + 1)}</div>`).join('');
   const b = $('#readybtn');
   b.textContent = mine && mine.ready ? 'Cancel ready' : 'Ready';
   b.classList.toggle('primary', !(mine && mine.ready));
@@ -238,12 +252,12 @@ function drawGame() {
   const last = g.lastDiscard ? g.lastDiscard.id : null;
   const flash = s => (S.flash && S.flash.seat === s && S.flash.until > Date.now() ? `<div class="flash">${esc(S.flash.text)}</div>` : '');
   const head = (p, s) => `<div class="phead"><span class="wind ${s === g.dealer ? 'dealer' : ''}" title="${W[p.wind]} seat${s === g.dealer ? ', dealer' : ''}">${WK[p.wind]}</span>
-      <span class="tag role ${s >> 1 ? 'r1' : 'r0'}" title="${ROLE[s]}">${ROLE[s][0]}</span><span class="pname">${esc(p.name)}</span>${s === (me ^ 1) ? '<span class="tag partner">Partner</span>' : ''}${p.riichi ? '<span class="tag riichi">Riichi</span>' : ''}${p.online ? '' : '<span class="tag warn">Away</span>'}
+      ${g.mode === 'ffa' ? `<span class="tag role ${s >> 1 ? 'r1' : 'r0'}" title="${ROLE[s]}">${ROLE[s][0]}</span><span class="pname">${esc(p.name)}</span>` : `<span class="pname">${who(p, s, g.mode)}</span>`}${g.mode !== 'ffa' && s === (me ^ 1) ? '<span class="tag partner">Partner</span>' : ''}${p.riichi ? '<span class="tag riichi">Riichi</span>' : ''}${p.online ? '' : '<span class="tag warn">Away</span>'}
       <span class="score">${p.score.toLocaleString()}</span></div>`;
   const myTurn = g.phase === 'action' && g.turn === me;
   const opp = s => {
     const p = P[s];
-    return `<section class="opp ${Math.floor(s / 2) === Math.floor(me / 2) ? 'ally' : ''} ${g.phase === 'action' && g.turn === s ? 'turn' : ''}">${head(p, s)}
+    return `<section class="opp ${g.mode !== 'ffa' && Math.floor(s / 2) === Math.floor(me / 2) ? 'ally' : ''} ${g.phase === 'action' && g.turn === s ? 'turn' : ''}">${head(p, s)}
       <div class="tiles ohand">${p.glass.map(t => tile(t)).join('')}${back().repeat(p.hidden)}${p.melds.map(meld).join('')}</div>
       <div class="pond">${pond(p.pond, last)}</div>${flash(s)}</section>`;
   };
@@ -264,7 +278,7 @@ function drawGame() {
   }
   let status = '';
   if (g.phase === 'action') {
-    status = !myTurn ? `${P[g.turn].name} is choosing a discard.`
+    status = !myTurn ? `${g.mode === 'ffa' ? P[g.turn].name : ROLE[g.turn]} is choosing a discard.`
       : P[me].riichi && !o.tsumo && !o.ankan.length ? 'You are in riichi. Your draw is discarded for you.'
         : S.riichiMode ? 'Choose the tile to discard with your riichi.'
           : S.sel != null ? 'Select the raised tile again to discard it.' : 'Your turn. Select a tile to discard.';
@@ -280,7 +294,7 @@ function drawGame() {
     <div class="opps">${opp((me + 3) % 4)}${opp((me + 2) % 4)}${opp((me + 1) % 4)}</div>
     <div class="mid">
       <div class="info"><h3>${W[g.roundWind]} ${g.kyoku + 1}</h3>
-        <dl class="facts"><dt>Akagi vs Washizu</dt><dd>${P[0].score.toLocaleString()} · ${P[2].score.toLocaleString()}</dd><dt>Hanchan</dt><dd>${g.hanchan} of ${g.hanchans}</dd><dt>Draws left</dt><dd>${g.drawsLeft}</dd><dt>Repeat counters</dt><dd>${g.honba}</dd><dt>Riichi sticks on table</dt><dd>${g.sticks}</dd></dl>
+        <dl class="facts">${g.mode === 'ffa' ? `<dt>Leaders</dt><dd>${leaders(P)}</dd>` : `<dt>Akagi vs Washizu</dt><dd>${P[0].score.toLocaleString()} · ${P[2].score.toLocaleString()}</dd>`}<dt>Hanchan</dt><dd>${g.hanchan} of ${g.hanchans}</dd><dt>Draws left</dt><dd>${g.drawsLeft}</dd><dt>Repeat counters</dt><dd>${g.honba}</dd><dt>Riichi sticks on table</dt><dd>${g.sticks}</dd></dl>
         <div class="muted" style="font-size:.85rem;margin-bottom:4px">Dora indicators</div><div class="tiles">${g.dora.map(t => tile(t)).join('')}</div>
         <div class="timer"><span id="tbar"></span></div><p class="status">${esc(status)}</p></div>
       <div class="mine"><div class="muted" style="font-size:.85rem;margin-bottom:6px">Your discards</div><div class="pond">${pond(mine.pond, last)}</div></div>
@@ -299,10 +313,15 @@ function overlay(g) {
   if (g.phase === 'over') {
     const t = S.table, mine = t.seats.find(s => s && s.name === S.me.name);
     const f = g.final, myTeam = g.seat >> 1;
-    return `<div class="overlay"><div class="sheet"><h2>${f.winner === myTeam ? 'Your team wins' : 'Your team loses'}</h2>
-      ${f.teams.map(tm => `<div class="win"><div class="teamline"><b>${esc(TEAM[tm.team])}${tm.team === myTeam ? ' (your team)' : ''}</b><span class="total">${tm.total.toLocaleString()}</span></div>
-        <div class="rank">${tm.members.map(m => `<span>${ROLE[m.seat]} · ${esc(m.name)}</span><span>${m.score.toLocaleString()}</span>`).join('')}</div></div>`).join('')}
-      <p class="muted" style="margin-top:14px">Akagi ${f.decider[0].toLocaleString()} against Washizu ${f.decider[1].toLocaleString()} — ${f.winner === 0 ? 'Akagi leads, so' : 'Washizu is not behind, so'} ${esc(TEAM[f.winner])} take the game.</p>
+    const head = f.standings
+      ? `<h2>${f.winner === g.seat ? 'You win the game' : `${esc(f.standings[0].name)} wins the game`}</h2>
+        <div class="rank" style="margin-top:14px">${f.standings.map(m => `<span${m.won ? ' class="pl"' : ''}>${['1st', '2nd', '3rd', '4th'][m.rank - 1]} · ${esc(m.name)}${m.seat === g.seat ? ' (you)' : ''}</span><span>${m.score.toLocaleString()}</span>`).join('')}</div>
+        <p class="muted" style="margin-top:14px">${esc(f.standings[0].name)} ${f.standings[0].score.toLocaleString()} against ${esc(f.standings[1].name)} ${f.standings[1].score.toLocaleString()} — the highest total takes the game.</p>`
+      : `<h2>${f.winner === myTeam ? 'Your team wins' : 'Your team loses'}</h2>
+        ${f.teams.map(tm => `<div class="win"><div class="teamline"><b>${esc(TEAM[tm.team])}${tm.team === myTeam ? ' (your team)' : ''}</b><span class="total">${tm.total.toLocaleString()}</span></div>
+          <div class="rank">${tm.members.map(m => `<span><b>${who(m, m.seat, 'team')}</b></span><span>${m.score.toLocaleString()}</span>`).join('')}</div></div>`).join('')}
+        <p class="muted" style="margin-top:14px">Akagi ${f.decider[0].toLocaleString()} against Washizu ${f.decider[1].toLocaleString()} — ${f.winner === 0 ? 'Akagi leads, so' : 'Washizu is not behind, so'} ${esc(TEAM[f.winner])} take the game.</p>`;
+    return `<div class="overlay"><div class="sheet">${head}
       <p class="muted" style="margin-top:8px">${t.seats.filter(s => s && s.ready).length} of 4 ready for another game with the same roles.</p>
       <div class="rowbtns" style="margin-top:14px"><button class="btn ${mine && mine.ready ? '' : 'primary'}" data-act="ready">${mine && mine.ready ? 'Cancel ready' : 'Play again'}</button><button class="btn" data-act="regroup">Change roles</button><button class="btn" data-act="leave">Leave table</button></div>
     </div></div>`;
@@ -311,12 +330,12 @@ function overlay(g) {
   let body = '', title;
   if (r.type === 'draw') {
     title = 'Exhaustive draw';
-    const tp = r.hands.map((h, s) => (h ? `<div class="win"><p><b>${esc(P[s].name)}</b> is tenpai.</p><div class="tiles">${h.hand.map(t => tile(t)).join('')}${h.melds.map(meld).join('')}</div></div>` : '')).join('');
+    const tp = r.hands.map((h, s) => (h ? `<div class="win"><p><b>${who(P[s], s, g.mode)}</b> is tenpai.</p><div class="tiles">${h.hand.map(t => tile(t)).join('')}${h.melds.map(meld).join('')}</div></div>` : '')).join('');
     body = tp || '<p class="muted">Nobody was one tile from winning.</p>';
   } else {
     title = r.type === 'tsumo' ? 'Tsumo' : 'Ron';
     body = r.winners.map(w => `<div class="win">
-      <p><b>${esc(P[w.seat].name)}</b> ${r.type === 'tsumo' ? 'wins by self-draw.' : `wins off ${esc(P[r.from].name)}'s discard.`}</p>
+      <p><b>${who(P[w.seat], w.seat, g.mode)}</b> ${r.type === 'tsumo' ? 'wins by self-draw.' : `wins off ${who(P[r.from], r.from, g.mode)}'s discard.`}</p>
       <div class="tiles" style="margin-top:8px">${w.hand.map(t => tile(t)).join('')}<span style="width:10px"></span>${tile(w.winTile, { cls: 'last' })}${w.melds.map(meld).join('')}</div>
       <div class="yaku">${w.yaku.map(y => `<span>${esc(y[0])}</span><span>${w.yakuman ? 'yakuman' : y[1] + ' han'}</span>`).join('')}</div>
       <p class="total">${w.limit ? esc(w.limit) + ', ' : ''}${w.yakuman ? '' : `${w.han} han ${w.fu} fu, `}${w.total.toLocaleString()} points</p></div>`).join('');
@@ -324,9 +343,12 @@ function overlay(g) {
       ${r.ura ? `<div class="muted" style="font-size:.85rem;margin-top:8px">Ura dora indicators</div><div class="tiles">${r.ura.map(t => tile(t)).join('')}</div>` : ''}</div>`;
   }
   const ready = g.nextReady.includes(g.seat);
+  // me, my partner, then the two opponents - (g.seat + 3) % 4 is the partner again on odd seats,
+  // so the last two seats are the ones that are neither me nor my partner
+  const order = [g.seat, g.seat ^ 1, ...[0, 1, 2, 3].filter(s => s !== g.seat && s !== (g.seat ^ 1))];
   return `<div class="overlay"><div class="sheet"><h2>${title}</h2>${body}
-    <div class="deltas">${[g.seat, g.seat ^ 1, (g.seat + 2) % 4, (g.seat + 3) % 4].map(s => { const p = P[s]; return `<div class="${Math.floor(s / 2) === Math.floor(g.seat / 2) ? 'ours' : ''}"><b>${esc(p.name)}</b><span class="${r.deltas[s] > 0 ? 'plus' : r.deltas[s] < 0 ? 'minus' : ''}">${r.deltas[s] > 0 ? '+' : ''}${r.deltas[s].toLocaleString()}</span><br>${p.score.toLocaleString()}</div>`; }).join('')}</div>
-    <p class="muted" style="margin-bottom:14px">Akagi ${P[0].score.toLocaleString()} vs Washizu ${P[2].score.toLocaleString()}.</p>
+    <div class="deltas">${order.map(s => { const p = P[s]; return `<div class="${g.mode !== 'ffa' && Math.floor(s / 2) === Math.floor(g.seat / 2) ? 'ours' : ''}"><b>${who(p, s, g.mode)}</b><span class="${r.deltas[s] > 0 ? 'plus' : r.deltas[s] < 0 ? 'minus' : ''}">${r.deltas[s] > 0 ? '+' : ''}${r.deltas[s].toLocaleString()}</span><br>${p.score.toLocaleString()}</div>`; }).join('')}</div>
+    <p class="muted" style="margin-bottom:14px">${g.mode === 'ffa' ? leaders(P) + '.' : `Akagi ${P[0].score.toLocaleString()} vs Washizu ${P[2].score.toLocaleString()}.`}</p>
     <button class="btn primary" data-act="next" ${ready ? 'disabled' : ''}>${ready ? 'Waiting for the others' : 'Continue'}</button>
   </div></div>`;
 }
@@ -377,7 +399,7 @@ document.addEventListener('submit', async e => {
     } catch (x) { err.textContent = x.message; }
     go.disabled = false;
   } else if (f.id === 'createform') {
-    sendMsg({ t: 'create', name: $('#tn').value, length: $('#tl').value, turnSec: +$('#tt').value });
+    sendMsg({ t: 'create', name: $('#tn').value, mode: $('#tm').value, length: $('#tl').value, turnSec: +$('#tt').value });
   } else if (f.id === 'chatform') {
     const i = $('#chatin');
     if (i.value.trim()) sendMsg({ t: 'chat', text: i.value });

@@ -55,7 +55,7 @@ const until = async (fn, what, ms = 5000) => { const end = Date.now() + ms; whil
   const state = [0, 1, 2, 3].map(() => ({ errs: [] }));
   const socks = [];
   let finished, acted = 0, playing = true;
-  const done = new Promise(r => { finished = r; });
+  let done; const armDone = () => { done = new Promise(r => { finished = r; }); }; armDone();
   function wire(ws, i) {
     socks[i] = ws;
     ws.on('message', raw => {
@@ -70,7 +70,8 @@ const until = async (fn, what, ms = 5000) => { const end = Date.now() + ms; whil
       // a client must never be sent another player's solid tiles, partner included
       g.players.forEach((p, s) => { if (s !== g.seat) { assert.ok(!p.tiles); assert.ok(p.glass.every(t => t & 3)); } });
       assert.ok(!raw.toString().includes('"pool"'), 'the bag never leaves the server');
-      const key = JSON.stringify([g.phase, g.turn, g.drawsLeft, g.kyoku, g.honba, g.roundWind, !!g.options, !!g.claim, g.players[g.seat].tiles.length, (g.nextReady || []).length]);
+      // mode and ev keep two games with the same final state (a team and an ffa East game) apart
+      const key = JSON.stringify([g.mode, g.ev, g.phase, g.turn, g.drawsLeft, g.kyoku, g.honba, g.roundWind, !!g.options, !!g.claim, g.players[g.seat].tiles.length, (g.nextReady || []).length]);
       if (key === state[i].key) return; state[i].key = key;
       if (g.phase === 'over') { if (i === 1) finished(g); return; }
       if (g.options) {
@@ -128,7 +129,6 @@ const until = async (fn, what, ms = 5000) => { const end = Date.now() + ms; whil
   assert.strictEqual(await closed, 4001);
 
   const final = await Promise.race([done, wait(90000).then(() => { throw new Error('game did not finish; actions sent: ' + acted + ' ' + JSON.stringify(state.map(s => [s.key, s.errs]))); })]);
-  playing = false;
   assert.strictEqual(final.final.teams.length, 2);
   for (const t of final.final.teams) assert.strictEqual(teamOf[t.members[0].name], teamOf[t.members[1].name]);
   assert.ok(!JSON.stringify(final.final).includes('"key"'), 'account keys are not sent to clients');
@@ -143,6 +143,37 @@ const until = async (fn, what, ms = 5000) => { const end = Date.now() + ms; whil
   say(1, { t: 'regroup' }); await until(() => state[2].game === null && state[2].table, 'change teams returns everyone to seating');
   for (const i of [0, 1, 2, 3]) { say(i, { t: 'leave' }); await until(() => state[i].table === null, 'leave ' + i); }
   await until(() => !state[0].lobby.tables.some(t => t.id === id), 'empty table disappears from the lobby');
+
+  // ---- free-for-all: a second table where the four play for themselves ----
+  say(0, { t: 'create', name: 'FFA_' + tag, mode: 'ffa', length: 'east', turnSec: 15, fakeWait: [20, 60] });
+  await until(() => state[1].lobby.tables.some(t => t.name === 'FFA_' + tag) && state[0].table, 'ffa table in the other instance\'s lobby');
+  const ffaTable = state[1].lobby.tables.find(t => t.name === 'FFA_' + tag);
+  assert.strictEqual(ffaTable.mode, 'ffa', 'the lobby lists the table\'s mode');
+  for (const i of [1, 2, 3]) { say(i, { t: 'join', id: ffaTable.id }); await until(() => state[i].table, 'ffa join ' + i); }
+  await until(() => state[0].table.seats.every(Boolean), 'ffa all seated');
+  assert.strictEqual(state[0].table.mode, 'ffa');
+  for (const i of [0, 1, 2, 3]) say(i, { t: 'ready', v: true });
+  armDone();
+  await until(() => state.every(s => s.game && s.game.mode === 'ffa'), 'ffa game start on all four sockets');
+  const ffaFinal = await Promise.race([done, wait(90000).then(() => { throw new Error('ffa game did not finish; ' + JSON.stringify(state.map(s => [s.key, s.errs]))); })]);
+  playing = false;
+  assert.strictEqual(ffaFinal.final.mode, 'ffa');
+  assert.ok(!('teams' in ffaFinal.final) && !('decider' in ffaFinal.final), 'an ffa final has no teams');
+  assert.strictEqual(ffaFinal.final.standings.length, 4);
+  for (let i = 0; i < 3; i++) {   // sorted by score; an exact tie goes to the lower seat
+    const [a, b] = [ffaFinal.final.standings[i], ffaFinal.final.standings[i + 1]];
+    assert.ok(a.score > b.score || a.seat < b.seat, 'ffa standings are sorted');
+  }
+  assert.strictEqual(ffaFinal.final.winner, ffaFinal.final.standings[0].seat, 'the highest total wins, so there are no drawn games');
+  assert.deepStrictEqual(ffaFinal.final.standings.map(m => m.won), [true, false, false, false]);
+  assert.ok(!JSON.stringify(ffaFinal.final).includes('"key"'), 'ffa: account keys are not sent to clients');
+  await wait(300);
+  const lb2 = (await get(1, 'leaderboard')).top.filter(u => N.includes(u.name));
+  assert.strictEqual(lb2.reduce((a, u) => a + u.stats.games, 0), 8, 'two games each');
+  assert.strictEqual(lb2.reduce((a, u) => a + u.stats.wins, 0), 3, 'one team win, one solo win');
+  assert.strictEqual(lb2.reduce((a, u) => a + u.stats.rating, 0), 6000, 'rating stays zero-sum after the ffa game');
+  for (const i of [0, 1, 2, 3]) { say(i, { t: 'leave' }); await until(() => state[i].table === null, 'ffa leave ' + i); }
+  await until(() => !state[0].lobby.tables.some(t => t.id === ffaTable.id), 'empty ffa table disappears from the lobby');
   let cmds = '';
   if (useRedis) { const info = await apps[0].store.r.info('stats'); cmds = ', redis commands: ' + /total_commands_processed:(\d+)/.exec(info)[1]; }
   console.log(`e2e passed (${useRedis ? 'redis' : 'memory'} store, 2 instances): full game, ${acted} actions${cmds}`);

@@ -128,10 +128,11 @@ button.tile:disabled{cursor:default}
 .phead{display:flex;align-items:baseline;gap:8px;margin-bottom:8px;flex-wrap:wrap}
 .phead .wind{font-family:var(--display);font-weight:800;font-size:1.15rem;width:1.4em;height:1.4em;display:inline-grid;place-items:center;border:1px solid var(--line-strong);border-radius:4px;align-self:center}
 .phead .wind.dealer{background:var(--lacquer);border-color:var(--lacquer)}
-.phead .pname{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:11em}
+.phead .pname{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:14em}
 .phead .score{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:500}
 .tag{font-size:.75rem;border-radius:3px;padding:.05em .45em;border:1px solid var(--line-strong);color:var(--mist)}
 .tag.riichi{border-color:var(--brass);color:var(--brass)}
+.un{font-size:.78rem;font-weight:400;color:var(--mist);white-space:nowrap}
 .tag.warn{border-color:#ffb4a8;color:#ffb4a8}
 .ohand{min-height:calc(var(--tw)*1.5)}
 .pond{margin-top:10px;display:grid;grid-template-columns:repeat(6,max-content);gap:3px;min-height:calc(var(--tw)*1.33*2 + 3px);--tw:23px;align-content:start}
@@ -167,6 +168,7 @@ button.tile:disabled{cursor:default}
 .deltas{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:16px 0}
 .deltas div{border:1px solid var(--line);border-radius:6px;padding:8px;font-size:.9rem;min-width:0}
 .deltas b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.deltas .un{display:block;margin-top:1px}
 .plus{color:#8be6aa}.minus{color:#ff9d91}
 .rank{display:grid;grid-template-columns:1fr auto;gap:2px 12px;margin:.4rem 0 0;color:var(--mist);font-variant-numeric:tabular-nums}
 .rank .pl{font-family:var(--display);font-weight:800;font-size:1.5rem}

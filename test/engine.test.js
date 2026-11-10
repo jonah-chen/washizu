@@ -211,4 +211,39 @@ assert.deepStrictEqual(rounds,
    [0, 2], [0, 2], [0, 2], [0, 2], [1, 2], [1, 2], [1, 2], [1, 2]]); // East, South, then East, South again
 assert.strictEqual(g3.phase, 'over');
 assert.deepStrictEqual(g3.scores, [85000, 45000, 5000, -35000]);     // two settlements of +30000/+10000/-10000/-30000
+
+// ---- free-for-all: no hanchan settlements, the highest total wins, a tie goes to the lower
+//      seat (so there are no drawn games), and unclaimed riichi sticks go to the winner ----
+const gffa = new Game({ players: [0, 1, 2, 3].map(i => ({ key: 'p' + i, name: 'P' + i })), length: 'hanchan2', noTimers: true, mode: 'ffa' });
+gffa.startHand();
+for (let h = 0; h < 16; h++) {                                       // the same schedule as the team game above
+  gffa.result = { type: 'draw', deltas: [0, 0, 0, 0], winners: [] };
+  gffa.next();
+}
+assert.strictEqual(gffa.phase, 'over');
+assert.deepStrictEqual(gffa.scores, [25000, 25000, 25000, 25000], 'free-for-all has no hanchan settlements');
+assert.strictEqual(gffa.final.mode, 'ffa');
+assert.strictEqual(gffa.final.winner, 0, 'a tie goes to the lower seat, so there are no drawn games');
+assert.deepStrictEqual(gffa.final.standings.map(m => [m.rank, m.seat, m.won]), [[1, 0, true], [2, 1, false], [3, 2, false], [4, 3, false]]);
+
+const gffb = new Game({ players: [0, 1, 2, 3].map(i => ({ key: 'p' + i, name: 'P' + i })), length: 'east', noTimers: true, mode: 'ffa' });
+gffb.startHand();
+for (let h = 0; h < 4; h++) {                                       // an East game: four hands
+  gffb.endHand({ type: 'draw', deltas: h === 3 ? [4000, -1000, -2000, -1000] : [0, 0, 0, 0], winners: [] });
+  if (h === 3) gffb.sticks = 3;
+  gffb.next();
+}
+assert.deepStrictEqual(gffb.scores, [32000, 24000, 23000, 24000], 'the unclaimed sticks go to the winner');
+assert.strictEqual(gffb.final.winner, 0);
+assert.deepStrictEqual(gffb.final.standings.map(m => [m.seat, m.score]), [[0, 32000], [1, 24000], [3, 24000], [2, 23000]], 'standings are by score, a tie by seat order');
+const vffa = gffb.view(3);
+assert.strictEqual(vffa.mode, 'ffa');
+assert.deepStrictEqual(vffa.final.standings.map(m => [m.rank, m.seat, m.won]), [[1, 0, true], [2, 1, false], [3, 3, false], [4, 2, false]]);
+assert.strictEqual(gffb.final.teams, undefined, 'a free-for-all final has no teams');
+
+// the mode survives a round trip through the shared store, and old saves default to team games
+assert.strictEqual(Game.fromJSON(JSON.parse(JSON.stringify(gffb))).mode, 'ffa');
+assert.strictEqual(Game.fromJSON({ players: [] }).mode, 'team');
+// an unknown mode is treated as a team game
+assert.strictEqual(new Game({ players: [0, 1, 2, 3].map(i => ({ key: 'p' + i, name: 'P' + i })), noTimers: true, mode: 'duel' }).mode, 'team');
 console.log('engine tests passed');

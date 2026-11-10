@@ -1,7 +1,7 @@
 {
   "name": "glass-mahjong",
   "version": "3.1.0",
-  "description": "Two-against-two online Washizu-style (transparent tile) riichi mahjong with accounts, lobby and an authoritative server.",
+  "description": "Online Washizu-style (transparent tile) riichi mahjong, two-against-two or free-for-all, with accounts, lobby and an authoritative server.",
     "main": "server.mjs",
   "scripts": {
     "start": "node dev.js",

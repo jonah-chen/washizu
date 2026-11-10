@@ -3,7 +3,8 @@
 Online riichi mahjong under the special rules Washizu Iwao invented in Nobuyuki
 Fukumoto's *Akagi: Yami ni Oritatta Tensai* —
 [the story and the rules](https://en.namu.wiki/w/%EC%99%80%EC%8B%9C%EC%A6%88%20%EB%A7%88%EC%9E%91) —
-played two against two, for exactly four human players. No bots.
+played for exactly four human players, two against two as in the story or free-for-all.
+No bots.
 
 In the story the game sits down to be played by four fixed roles — **Akagi** and
 **Yasuoka** against **Washizu** and **Suzuki** — and it is riichi mahjong with two
@@ -102,10 +103,28 @@ normal and private windows in two browsers) and make one account in each.
 `REDIS_URL=redis://localhost:6379 npm run test:redis` plays a full game across two server
 instances that share only that Redis, including a player switching instance mid-game.
 
+## Game modes
+
+The host chooses the mode when creating a table. The mahjong rules are the same in
+both; only how the game ends and how it is scored differ.
+
+- **Two against two** (the default) — the story's match: Akagi & Yasuoka against
+  Washizu & Suzuki, with hanchan settlements. See "Roles and teams" below.
+- **Free-for-all** — everyone plays for themselves:
+  - There are no hanchan settlements. The game ends after its last scheduled hand, and
+    unclaimed riichi sticks go to the winner.
+  - The player with the highest total points wins. If two players are level at the top,
+    the one sitting earlier in play order takes it, so — as in team games — there are
+    no drawn games.
+  - The rating is settled against the other three individually: the winner takes a
+    share from each loser, the bigger the score margin the bigger the share, and the
+    four players' changes always net out to zero.
+
 ## Roles and teams
 
 - Each seat is a fixed role, in play order: 0 Akagi, 1 Yasuoka, 2 Washizu, 3 Suzuki.
   In the waiting room a player picks their role by taking the seat; Akagi deals first.
+  The roles are the same in free-for-all, where they decide a tied top score.
 - Teams are the adjacent pairs: Akagi & Yasuoka against Washizu & Suzuki.
 - Every player scores as in ordinary riichi mahjong, starting on 25,000. A team's
   total is the sum of its two players.
@@ -166,7 +185,9 @@ All keys in Redis start with `gm:`, so the database can be shared with other app
 - All standard yaku and yakuman, open tanyao allowed. Counted yakuman at 13 han.
 - Exhaustive draw with tenpai payments. Dealer repeats on a win or when tenpai at a draw.
 - The game ends after the last hanchan of the chosen length. There is no early end for a
-  negative score, and the winner is the Akagi-vs-Washizu comparison, never a draw.
+  negative score. In two-against-two the winner is the Akagi-vs-Washizu comparison; in
+  free-for-all the game ends after the last hand and the highest total wins, a tie going
+  to the lower seat — either way, never a draw.
 - When a call is possible, glass tiles are used for the meld first, so your solid tiles stay in hand.
 
 Not implemented: abortive draws, nagashi mangan, liability payments (pao), and robbing a
