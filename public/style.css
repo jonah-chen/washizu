@@ -119,12 +119,13 @@ button.tile:disabled{cursor:default}
 .chat input{flex:1;min-width:0}
 
 /* ---------- game ---------- */
-.gamewrap{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:16px;padding:12px 16px 20px;max-width:1500px;margin:0 auto}
-.gamewrap .chat{max-height:calc(100vh - 90px);position:sticky;top:12px;align-self:start}
+/* Three rows: the opponents across the top, info / your discards / the stakes in the middle,
+   your hand and the chat along the bottom. The chat is fixed-size and scrolls on its own. */
+.gamewrap{padding:12px 16px 20px;max-width:1560px;margin:0 auto}
 #game{position:relative;min-width:0}
 .opps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-.opp{border:1px solid var(--line);border-radius:8px;padding:10px;position:relative;min-width:0;container-type:inline-size;--tw:25px}
-.ohand{--tw:min(27px,6.1cqw)}
+.opp{border:1px solid var(--line);border-radius:8px;padding:10px;position:relative;min-width:0;container-type:inline-size;--tw:30px}
+.ohand{--tw:min(33px,6.8cqw)}
 .opp.turn,.me.turn{border-color:var(--brass)}
 .phead{display:flex;align-items:baseline;gap:8px;margin-bottom:8px;flex-wrap:wrap}
 .phead .wind{font-family:var(--display);font-weight:800;font-size:1.15rem;width:1.4em;height:1.4em;display:inline-grid;place-items:center;border:1px solid var(--line-strong);border-radius:4px;align-self:center}
@@ -137,17 +138,22 @@ button.tile:disabled{cursor:default}
 .tag.warn{border-color:#ffb4a8;color:#ffb4a8}
 .ohand{min-height:calc(var(--tw)*1.5)}
 .pond{margin-top:10px;display:grid;grid-template-columns:repeat(6,max-content);gap:3px;min-height:calc(var(--tw)*1.33*2 + 3px);--tw:23px;align-content:start}
+.opp .pond{--tw:26px}
 .pond .tile.side{margin:0;transform:none;outline:1px solid var(--brass)}
 .flash{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;font-family:var(--display);font-weight:800;font-size:2.4rem;color:#fff;text-shadow:0 2px 18px rgba(0,0,0,.8);background:rgba(197,57,44,.28);border-radius:8px;animation:flash 1.3s forwards}
 @keyframes flash{0%{opacity:0;transform:scale(1.15)}15%{opacity:1;transform:none}75%{opacity:1}100%{opacity:0}}
-.mid{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:10px;margin:10px 0}
+/* The middle row: the round's information, your discards in a 6-wide pond, and the stakes at
+   the right. With no stake the third column simply collapses. */
+.mid{display:grid;grid-template-columns:minmax(0,280px) minmax(0,1fr) auto;gap:10px;margin:10px 0 0;align-items:stretch}
 .info{border:1px solid var(--line);border-radius:8px;padding:12px}
 .info h3{font-size:1.5rem}
 .facts{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:.6rem 0;font-size:.9rem}
 .facts dt{color:var(--mist)}.facts dd{margin:0;font-variant-numeric:tabular-nums}
 .info .tiles{--tw:30px}
-.mine{border:1px solid var(--line);border-radius:8px;padding:10px}
-.mine .pond{--tw:30px;margin-top:0;grid-template-columns:repeat(12,max-content)}
+.mine{border:1px solid var(--line);border-radius:8px;padding:10px;min-width:0}
+/* Your pond: six across (like a real table), a little smaller than your hand; past the
+   six-by-three the rows keep growing down, in the order the tiles went down. */
+.mine .pond{--tw:28px;margin-top:0}
 .timer{height:4px;background:rgba(206,240,233,.12);border-radius:2px;overflow:hidden;margin-top:10px}
 .timer span{display:block;height:100%;background:var(--brass);width:0}
 .status{font-size:.9rem;color:var(--mist);margin-top:6px;min-height:1.4em}
@@ -158,6 +164,10 @@ button.tile:disabled{cursor:default}
 .myhand{display:flex;flex-wrap:wrap;align-items:flex-end;gap:calc(var(--tw)*.07);padding-top:calc(var(--tw)*.35)}
 .myhand .drawn{margin-left:calc(var(--tw)*.4)}
 .hint{font-size:.82rem;color:var(--mist);margin-top:10px}
+
+/* The bottom row: your hand takes the row, the chat a fixed corner at its right. */
+.bottom{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:10px;align-items:start;margin-top:10px}
+.bottom .chat{min-height:0;height:170px}
 
 .overlay{position:fixed;inset:0;background:rgba(6,20,19,.84);display:grid;place-items:center;padding:16px;z-index:10;overflow:auto}
 .sheet{background:var(--felt);border:1px solid var(--line-strong);border-radius:10px;padding:24px;max-width:720px;width:100%;--tw:34px}
@@ -174,14 +184,24 @@ button.tile:disabled{cursor:default}
 .rank{display:grid;grid-template-columns:1fr auto;gap:2px 12px;margin:.4rem 0 0;color:var(--mist);font-variant-numeric:tabular-nums}
 .rank .pl{font-family:var(--display);font-weight:800;font-size:1.5rem}
 
-@media (max-width:1100px){.gamewrap{grid-template-columns:1fr}.gamewrap .chat{position:static;max-height:240px}}
+/* Narrower screens keep the same three rows: the tiles step down, the middle row tightens,
+   and the chat drops below the hand (the old chat-at-the-bottom arrangement). */
+@media (max-width:1100px){
+  .ohand{--tw:min(28px,6.2cqw)}
+  .opp .pond{--tw:22px}
+  .mid{grid-template-columns:minmax(0,240px) minmax(0,1fr) minmax(0,210px)}
+  .mine .pond{--tw:26px}
+  .bottom{grid-template-columns:1fr}
+  .bottom .chat{height:150px}
+}
 @media (max-width:760px){
   :root{--tw:clamp(21px,6.3vw,40px)}
   .gamewrap{padding:8px}
   .opps{grid-template-columns:1fr}
-    .pond{--tw:20px;grid-template-columns:repeat(12,max-content);min-height:calc(var(--tw)*1.33)}
+  .opp .pond{--tw:20px;grid-template-columns:repeat(12,max-content);min-height:calc(var(--tw)*1.33)}
   .mid{grid-template-columns:1fr}
-  .mine .pond{--tw:24px;grid-template-columns:repeat(9,max-content)}
+  .mine .pond{--tw:24px}
+  .bottom .chat{height:140px}
   .deltas{grid-template-columns:repeat(2,1fr)}
 }
 /* ---------- the stakes: blood and money (staked team tables) ---------- */
@@ -189,16 +209,21 @@ button.tile:disabled{cursor:default}
 .tag.bet{border-color:var(--lacquer-hi);color:#ffb4a8;background:rgba(197,57,44,.14)}
 
 /* The stakes as they stand: eight tubes of 250cc (the story's 2,000cc) over a picture of the
-   blood bags, and the money taken, a note of 10,000 yen each. */
-.stakebox{border:1px solid rgba(222,85,70,.5);border-radius:8px;padding:10px 12px;margin:.8rem 0;
+   blood bags, and the money taken so far as a run of 10,000-yen notes. The ? in the header
+   carries the explanation that no longer fits in the box. */
+.stakebox{position:relative;border:1px solid rgba(222,85,70,.5);border-radius:8px;padding:10px 12px;
   background:linear-gradient(100deg,rgba(12,8,8,.92) 45%,rgba(12,8,8,.55)),url(/assets/blood.png);
   background-size:cover;background-position:center}
-.sbhead{font-family:var(--display);font-weight:700;font-size:.95rem;margin-bottom:.35rem}
-.sbhead .muted{font-family:var(--ui);font-weight:400;font-size:.78rem}
-.sbrow{display:flex;align-items:center;gap:12px;margin-top:.55rem}
-.tubes{display:flex;gap:3px;padding:2px;flex:none}
+.mid .stakebox{width:240px}
+.sheet .stakebox{margin:14px 0}
+.sbhead{font-family:var(--display);font-weight:700;font-size:.95rem;display:flex;align-items:center}
+.stakeinfo{position:relative;margin-left:auto;width:1.5em;height:1.5em;display:grid;place-items:center;border:1px solid var(--line-strong);border-radius:50%;font-family:var(--ui);font-size:.72rem;font-weight:600;color:var(--mist);cursor:help;line-height:1}
+.stakeinfo:hover,.stakeinfo:focus-visible{color:var(--bone);border-color:var(--bone);outline:none}
+.staketip{display:none;position:absolute;top:50%;right:calc(100% + 10px);transform:translateY(-50%);width:230px;max-width:62vw;background:rgba(6,22,21,.98);border:1px solid var(--line-strong);border-radius:8px;padding:10px 12px;font-family:var(--ui);font-size:.8rem;font-weight:400;color:var(--mist);text-align:left;line-height:1.5;box-shadow:0 12px 32px rgba(0,0,0,.55);z-index:30}
+.stakeinfo:hover .staketip,.stakeinfo:focus-visible .staketip{display:block}
+.tubes{display:flex;gap:3px;padding:8px 2px 2px;flex:none;justify-content:center}
 /* each tube is a different slice of the bags, so no two look alike */
-.tube{position:relative;width:12px;height:58px;border:1px solid rgba(206,240,233,.4);border-radius:3px 3px 4px 4px;overflow:hidden;
+.tube{position:relative;width:12px;height:50px;border:1px solid rgba(206,240,233,.4);border-radius:3px 3px 4px 4px;overflow:hidden;
   background:linear-gradient(rgba(16,24,28,.55),rgba(16,24,28,.25)),url(/assets/blood.png) no-repeat;background-size:800% 100%;background-position:0% 100%}
 .tube:nth-child(2){background-position:14.3% 100%}.tube:nth-child(3){background-position:28.6% 100%}
 .tube:nth-child(4){background-position:42.9% 100%}.tube:nth-child(5){background-position:57.1% 100%}
@@ -206,11 +231,13 @@ button.tile:disabled{cursor:default}
 .tube:nth-child(8){background-position:100% 100%}
 .tube i{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(#c5392c,#7c1c13);box-shadow:inset 0 2px 3px rgba(255,255,255,.3);transition:height .5s}
 .tube::after{content:"";position:absolute;inset:0;box-shadow:inset 2px 0 3px rgba(255,255,255,.16);pointer-events:none}
-.sbstat{display:flex;flex-direction:column;line-height:1.35;min-width:0}
+.moneybar{height:22px;margin-top:8px;border:1px solid var(--line-strong);border-radius:4px;overflow:hidden;background:rgba(0,0,0,.4)}
+.moneybar i{display:block;height:100%;width:0;background:url(/assets/bill10000.jpg) repeat-x;background-size:auto 100%;
+  box-shadow:inset 0 -8px 12px rgba(0,0,0,.4),inset 0 2px 2px rgba(0,0,0,.3);transition:width .5s}
+.sbstat{display:flex;align-items:baseline;gap:6px;margin-top:6px}
 .sbstat b{font-size:1.02rem;font-variant-numeric:tabular-nums}
 .sbstat b.dead{color:#ff9d91}
 .sbstat .muted{font-size:.78rem}
-.bill{width:72px;height:auto;flex:none;border-radius:3px;border:1px solid var(--line-strong);box-shadow:0 3px 10px rgba(0,0,0,.55)}
 
 /* a payment under the stakes: a strip that slides in for a few seconds */
 .payflash{max-width:680px;margin:0 auto 10px;padding:10px 14px;border-radius:8px;display:flex;gap:12px;align-items:center;
@@ -223,5 +250,5 @@ button.tile:disabled{cursor:default}
 .payflash.money::before{background-image:url(/assets/money.png)}
 @keyframes payin{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 
-@media (max-width:760px){.tube{width:9px;height:46px}.bill{width:56px}}
+@media (max-width:760px){.tube{width:9px;height:40px}.moneybar{height:18px}}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01s!important;transition:none!important}}

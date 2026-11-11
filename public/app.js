@@ -12,9 +12,9 @@ const LEN = { east: 'East round only', south: 'East and South', hanchan2: '2 han
 // The story's bet: Washizu's 20 million yen for 2,000cc of Akagi's blood, worth the table's
 // whole stake in points. Low stakes spread the blood over 200,000 points, high over 20,000.
 const STAKE = {
-  none: { label: 'No stake', pts: 0 },
-  low: { label: 'Low stake', pts: 200000 },
-  high: { label: 'High stake', pts: 20000 },
+  none: { label: 'No stake', pts: 0, yen: 0 },
+  low: { label: 'Low stake', pts: 200000, yen: 20000000 },
+  high: { label: 'High stake', pts: 20000, yen: 20000000 },
 };
 const fmtYen = n => '¥' + Math.abs(n).toLocaleString();
 // In team games the fixed role is a player's identity, shown at full size, with the account
@@ -209,7 +209,8 @@ const shells = {
   room: () => `<header class="top"><span class="brand">Washizu Mahjong</span><button class="btn small" data-act="leave">Leave table</button></header>
     <main class="room"><div><h2 id="rname"></h2><p class="muted" id="rmeta"></p><div class="seats" id="seats"></div>
       <div class="rowbtns"><button class="btn primary" id="readybtn" data-act="ready"></button></div><p class="status" id="rstatus"></p></div>${chatShell()}</main>`,
-  game: () => `<div class="gamewrap"><div id="game"></div>${chatShell()}</div>`,
+  // The chat is drawn inside the game's bottom row (drawGame), next to the hand.
+  game: () => `<div class="gamewrap"><div id="game"></div></div>`,
 };
 
 function drawAuth() {
@@ -275,21 +276,20 @@ function drawRoom() {
 function stakeBox(g) {
   if (!g.stake) return '';
   const { pts, blood, money, dead } = g.stake;
+  const full = STAKE[g.stake.level].yen;
+  const pct = full ? Math.max(0, Math.min(100, (money / full) * 100)) : 0;
   const tubes = [0, 1, 2, 3, 4, 5, 6, 7].map(i => {
     const f = Math.max(0, Math.min(1, (blood - i * 250) / 250));
     return `<span class="tube" title="${(i * 250).toLocaleString()}–${((i + 1) * 250).toLocaleString()}cc"><i style="height:${(f * 100).toFixed(1)}%"></i></span>`;
   }).join('');
-  const notes = Math.round(money / 10000);
+  // The ? holds everything that does not fit: what the stake is worth, and what the blood means.
+  const tip = `${STAKE[g.stake.level].label} — 20,000,000 yen for 2,000cc of Akagi's blood, worth ${pts.toLocaleString()} points. Blood is drawn as Akagi's side loses points directly to Washizu's side; more than 2,000cc lost and Akagi dies, the game over at once.`;
   return `<div class="stakebox">
-    <div class="sbhead">The stakes · ${STAKE[g.stake.level].label} <span class="muted">— 20,000,000 yen for 2,000cc, worth ${pts.toLocaleString()} points</span></div>
-    <div class="sbrow">
-      <div class="tubes" title="The blood lost so far">${tubes}</div>
-      <div class="sbstat"><b class="${dead ? 'dead' : ''}">${dead ? 'Akagi is dead' : blood.toLocaleString() + 'cc lost'}</b><span class="muted">of the 2,000cc${dead ? '' : ' he can lose'}</span></div>
-    </div>
-    <div class="sbrow">
-      <img class="bill" src="/assets/bill10000.jpg" alt="A 10,000 yen note" draggable="false">
-      <div class="sbstat"><b>${fmtYen(money)}</b><span class="muted">${notes.toLocaleString()} notes of 10,000 yen${money ? ", in Akagi's hand" : ', not taken yet'}</span></div>
-    </div>
+    <div class="sbhead">The stakes<span class="stakeinfo" tabindex="0" aria-label="About the stakes">?<span class="staketip" role="tooltip">${tip}</span></span></div>
+    <div class="tubes" title="The blood lost so far">${tubes}</div>
+    <div class="sbstat"><b class="${dead ? 'dead' : ''}">${dead ? 'Akagi is dead' : blood.toLocaleString() + 'cc'}</b><span class="muted">${dead ? 'more than 2,000cc lost — Washizu’s team wins the match' : 'lost of the 2,000cc'}</span></div>
+    <div class="moneybar" title="The money taken so far, out of the 20,000,000 yen at stake"><i style="width:${pct.toFixed(1)}%"></i></div>
+    <div class="sbstat"><b>${fmtYen(money)}</b><span class="muted">taken so far</span></div>
   </div>`;
 }
 // The words on the payment banner. lastPayment: { dir, cc, choice, transfused, money, blood }.
@@ -347,24 +347,36 @@ function drawGame() {
   const hand = handTiles.map(t => btn(t)).join('') + (g.drawn != null ? btn(g.drawn, 'drawn') : '') + mine.melds.map(meld).join('');
 
   const pf = g.stake && S.payFlash && S.payFlash.until > Date.now() ? payFlashText(S.payFlash.pay, g.stake.dead) : '';
+  // The chat lives in the bottom row, so every redraw replaces it: keep its draft, focus and scroll.
+  const ci0 = $('#chatin'), cl0 = $('#chatlog');
+  const draft = ci0 ? ci0.value : '';
+  const chatFocused = ci0 === document.activeElement;
+  const stick = cl0 ? cl0.scrollHeight - cl0.scrollTop - cl0.clientHeight < 40 : true;
+  const oldScroll = cl0 ? cl0.scrollTop : 0;
   el.innerHTML = `
     ${pf ? `<div class="payflash ${S.payFlash.pay.dir < 0 ? 'blood' : 'money'}" role="status">${pf}</div>` : ''}
     <div class="opps">${opp((me + 3) % 4)}${opp((me + 2) % 4)}${opp((me + 1) % 4)}</div>
     <div class="mid">
       <div class="info"><h3>${W[g.roundWind]} ${g.kyoku + 1}</h3>
         <dl class="facts">${g.mode === 'ffa' ? `<dt>Leaders</dt><dd>${leaders(P)}</dd>` : `<dt>Akagi vs Washizu</dt><dd>${P[0].score.toLocaleString()} · ${P[2].score.toLocaleString()}</dd>`}<dt>Hanchan</dt><dd>${g.hanchan} of ${g.hanchans}</dd><dt>Draws left</dt><dd>${g.drawsLeft}</dd><dt>Repeat counters</dt><dd>${g.honba}</dd><dt>Riichi sticks on table</dt><dd>${g.sticks}</dd></dl>
-        ${stakeBox(g)}
         <div class="muted" style="font-size:.85rem;margin-bottom:4px">Dora indicators</div><div class="tiles">${g.dora.map(t => tile(t)).join('')}</div>
         <div class="timer"><span id="tbar"></span></div><p class="status">${esc(status)}</p></div>
       <div class="mine"><div class="muted" style="font-size:.85rem;margin-bottom:6px">Your discards</div><div class="pond">${pond(mine.pond, last)}</div></div>
+      ${stakeBox(g)}
     </div>
-    <section class="me ${myTurn ? 'turn' : ''}">${head(mine, me)}
-      <div class="actions">${acts.join('')}${g.furiten ? '<span class="tag warn" title="One of your winning tiles is in your discards or you let one pass, so you cannot win by ron.">Furiten</span>' : ''}</div>
-      <div class="myhand">${hand}</div>
-      <p class="hint">Glass tiles in your hand are visible to the whole table. Your solid tiles are the only ones your opponents cannot read.</p>${flash(me)}
-    </section>${overlay(g)}`;
+    <div class="bottom">
+      <section class="me ${myTurn ? 'turn' : ''}">${head(mine, me)}
+        <div class="actions">${acts.join('')}${g.furiten ? '<span class="tag warn" title="One of your winning tiles is in your discards or you let one pass, so you cannot win by ron.">Furiten</span>' : ''}</div>
+        <div class="myhand">${hand}</div>
+        <p class="hint">Glass tiles in your hand are visible to the whole table. Your solid tiles are the only ones your opponents cannot read.</p>${flash(me)}
+      </section>
+      ${chatShell()}
+    </div>${overlay(g)}`;
   tick();
   drawChat();
+  const ci = $('#chatin'), cl = $('#chatlog');
+  if (ci) { if (draft) ci.value = draft; if (chatFocused) ci.focus(); }
+  if (cl) { if (stick) cl.scrollTop = cl.scrollHeight; else cl.scrollTop = oldScroll; }
 }
 
 function overlay(g) {
