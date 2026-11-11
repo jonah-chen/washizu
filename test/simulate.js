@@ -6,13 +6,17 @@ const { Game } = require('../lib/game');
 const pick = a => a[Math.floor(Math.random() * a.length)];
 const N = +process.argv[2] || 150;
 const LENGTHS = ['east', 'south', 'hanchan2', 'hanchan4', 'hanchan6'];
-const stat = { hands: 0, ron: 0, tsumo: 0, draw: 0, riichi: 0, calls: 0, kans: 0, yakuman: 0, games: 0, team: 0, ffa: 0, length: {} };
+const STAKES = ['none', 'low', 'high'];
+const stat = { hands: 0, ron: 0, tsumo: 0, draw: 0, riichi: 0, calls: 0, kans: 0, yakuman: 0, games: 0, team: 0, ffa: 0, settles: 0, staked: 0, deaths: 0, length: {} };
 
 for (let g = 0; g < N; g++) {
   let over = null;
+  let lastPayN = 0;
   const length = LENGTHS[g % LENGTHS.length];
   const mode = g % 2 ? 'ffa' : 'team';
-  let game = new Game({ players: [0, 1, 2, 3].map(i => ({ key: 'p' + i, name: 'P' + i })), length, mode, noTimers: true });
+  const stake = mode === 'team' ? STAKES[g % STAKES.length] : 'none';
+  let game = new Game({ players: [0, 1, 2, 3].map(i => ({ key: 'p' + i, name: 'P' + i })), length, mode, stake, noTimers: true });
+  if (stake !== 'none') stat.staked++;
   game.start();
   let steps = 0;
   const must = (seat, m) => { const e = game.act(seat, m); assert.ok(!e, `${JSON.stringify(m)} -> ${e}`); };
@@ -22,6 +26,9 @@ for (let g = 0; g < N; g++) {
     game = Game.fromJSON(JSON.parse(JSON.stringify(game)));
     if (game.phase === 'over') { over = game.final; break; }
     assert.strictEqual(game.scores.reduce((a, b) => a + b, 0) + game.sticks * 1000, 100000, 'points conserved');
+    assert.ok(!game.dead || game.phase === 'over', 'a dead Akagi ends the game at once');
+    assert.ok(game.bloodLost <= 2000 || game.dead, 'more than 2,000cc lost means dead');
+    if (game.lastPayment) { assert.ok(game.lastPayment.n >= lastPayN, 'payments happen in order'); lastPayN = game.lastPayment.n; }
     if (game.phase === 'action') {
       const s = game.turn, v = game.view(s), o = v.options;
       // every seat sees exactly its own opaque tiles and nobody else's
@@ -51,6 +58,17 @@ for (let g = 0; g < N; g++) {
       else if (o.pon && Math.random() < 0.3) { stat.calls++; must(s, { a: 'claim', c: 'pon' }); }
       else if (o.chi && Math.random() < 0.2) { stat.calls++; must(s, { a: 'claim', c: 'chi', i: 0 }); }
       else must(s, { a: 'claim', c: 'pass' });
+    } else if (game.phase === 'settle') {
+      // Akagi is ahead: his player chooses the yen or the transfusion, nobody else may choose
+      stat.settles++;
+      assert.ok(game.stake !== 'none' && game.mode === 'team');
+      const v = game.view(0);
+      const rate = game.stake === 'high' ? 1000 : 100;        // yen per point (cc: 0.1 / 0.01)
+      assert.ok(v.settle && v.settle.points > 0);
+      assert.strictEqual(v.settle.yen, Math.round(v.settle.points * rate), 'the yen follow the stake');
+      assert.strictEqual(v.settle.cc, Math.round(v.settle.points * rate / 10000), 'the cc follow the stake');
+      assert.ok(game.act(2, { a: 'settle', c: 'money' }), 'only the player of Akagi may choose');
+      must(0, { a: 'settle', c: Math.random() < 0.5 ? 'money' : 'transfuse' });
     } else if (game.phase === 'ended') {
       const r = game.result; stat.hands++; stat[r.type]++;
       assert.strictEqual(r.deltas.reduce((a, b) => a + b, 0) % 1000, 0);
@@ -84,7 +102,16 @@ for (let g = 0; g < N; g++) {
       assert.strictEqual(t.won, over.winner === t.team);
     }
     assert.ok(over.winner === 0 || over.winner === 1, 'there are no drawn games');
-    assert.strictEqual(over.winner, over.decider[0] > over.decider[1] ? 0 : 1, 'Akagi vs Washizu decides the winner');
+    if (over.stake) {
+      // the bet decides the match: a dead Akagi loses at once, otherwise his team wins by surviving
+      assert.strictEqual(over.winner, over.stake.dead ? 1 : 0);
+      assert.strictEqual(over.stake.blood, game.bloodLost);
+      assert.strictEqual(over.stake.money, game.money);
+      assert.ok(over.stake.dead || game.bloodLost <= 2000);
+      if (over.stake.dead) stat.deaths++;
+    } else {
+      assert.strictEqual(over.winner, over.decider[0] > over.decider[1] ? 0 : 1, 'Akagi vs Washizu decides the winner');
+    }
   }
 }
 console.log('simulation passed', JSON.stringify(stat));

@@ -14,6 +14,7 @@ h1,h2,h3{font-family:var(--display);font-weight:700;line-height:1.15;margin:0}
 p{margin:0}
 button,input,select{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+[hidden]{display:none!important} /* the display rules above would otherwise beat the browser's default */
 .muted{color:var(--mist)}
 .btn{border:1px solid var(--line-strong);background:transparent;border-radius:6px;padding:.55em 1.1em;cursor:pointer;font-weight:500}
 .btn:hover{background:rgba(206,240,233,.08)}
@@ -183,4 +184,44 @@ button.tile:disabled{cursor:default}
   .mine .pond{--tw:24px;grid-template-columns:repeat(9,max-content)}
   .deltas{grid-template-columns:repeat(2,1fr)}
 }
+/* ---------- the stakes: blood and money (staked team tables) ---------- */
+.auth .banner{width:100%;max-width:560px;border-radius:12px;border:1px solid var(--line-strong);box-shadow:0 24px 60px rgba(0,0,0,.55);margin-bottom:1.4rem}
+.tag.bet{border-color:var(--lacquer-hi);color:#ffb4a8;background:rgba(197,57,44,.14)}
+
+/* The stakes as they stand: eight tubes of 250cc (the story's 2,000cc) over a picture of the
+   blood bags, and the money taken, a note of 10,000 yen each. */
+.stakebox{border:1px solid rgba(222,85,70,.5);border-radius:8px;padding:10px 12px;margin:.8rem 0;
+  background:linear-gradient(100deg,rgba(12,8,8,.92) 45%,rgba(12,8,8,.55)),url(/assets/blood.png);
+  background-size:cover;background-position:center}
+.sbhead{font-family:var(--display);font-weight:700;font-size:.95rem;margin-bottom:.35rem}
+.sbhead .muted{font-family:var(--ui);font-weight:400;font-size:.78rem}
+.sbrow{display:flex;align-items:center;gap:12px;margin-top:.55rem}
+.tubes{display:flex;gap:3px;padding:2px;flex:none}
+/* each tube is a different slice of the bags, so no two look alike */
+.tube{position:relative;width:12px;height:58px;border:1px solid rgba(206,240,233,.4);border-radius:3px 3px 4px 4px;overflow:hidden;
+  background:linear-gradient(rgba(16,24,28,.55),rgba(16,24,28,.25)),url(/assets/blood.png) no-repeat;background-size:800% 100%;background-position:0% 100%}
+.tube:nth-child(2){background-position:14.3% 100%}.tube:nth-child(3){background-position:28.6% 100%}
+.tube:nth-child(4){background-position:42.9% 100%}.tube:nth-child(5){background-position:57.1% 100%}
+.tube:nth-child(6){background-position:71.4% 100%}.tube:nth-child(7){background-position:85.7% 100%}
+.tube:nth-child(8){background-position:100% 100%}
+.tube i{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(#c5392c,#7c1c13);box-shadow:inset 0 2px 3px rgba(255,255,255,.3);transition:height .5s}
+.tube::after{content:"";position:absolute;inset:0;box-shadow:inset 2px 0 3px rgba(255,255,255,.16);pointer-events:none}
+.sbstat{display:flex;flex-direction:column;line-height:1.35;min-width:0}
+.sbstat b{font-size:1.02rem;font-variant-numeric:tabular-nums}
+.sbstat b.dead{color:#ff9d91}
+.sbstat .muted{font-size:.78rem}
+.bill{width:72px;height:auto;flex:none;border-radius:3px;border:1px solid var(--line-strong);box-shadow:0 3px 10px rgba(0,0,0,.55)}
+
+/* a payment under the stakes: a strip that slides in for a few seconds */
+.payflash{max-width:680px;margin:0 auto 10px;padding:10px 14px;border-radius:8px;display:flex;gap:12px;align-items:center;
+  font-weight:500;border:1px solid var(--line-strong);background-size:cover;background-position:center;
+  box-shadow:0 10px 30px rgba(0,0,0,.45);animation:payin .25s}
+.payflash::before{content:"";width:54px;height:54px;flex:none;border-radius:6px;background-size:cover;background-position:center}
+.payflash.blood{background-image:linear-gradient(90deg,rgba(64,10,8,.94) 35%,rgba(40,8,8,.78)),url(/assets/blood.png)}
+.payflash.blood::before{background-image:url(/assets/blood.png)}
+.payflash.money{background-image:linear-gradient(90deg,rgba(16,38,33,.95) 35%,rgba(12,28,24,.82)),url(/assets/money.png)}
+.payflash.money::before{background-image:url(/assets/money.png)}
+@keyframes payin{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+
+@media (max-width:760px){.tube{width:9px;height:46px}.bill{width:56px}}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01s!important;transition:none!important}}

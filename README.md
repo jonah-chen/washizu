@@ -6,8 +6,8 @@ Fukumoto's *Akagi: Yami ni Oritatta Tensai* —
 played for exactly four human players, two against two as in the story or free-for-all.
 No bots.
 
-In the story the game sits down to be played by four fixed roles — **Akagi** and
-**Yasuoka** against **Washizu** and **Suzuki** — and it is riichi mahjong with two
+In the story the game sits down to be played by four fixed roles — **Akagi**, backed by
+**Yasuoka**, against **Washizu**, backed by **Suzuki** — and it is riichi mahjong with two
 perversions of the ordinary rules:
 
 **Crystal tiles.** Three of the four copies of every tile are made of transparent
@@ -23,13 +23,21 @@ nobody can feel the tiles; the dora indicator is drawn from the hole before the 
 and a hand ends in a draw when all players' discards total 70. Here the hole is
 simulated as a bag: every draw is uniformly random.
 
-**The stakes.** In the story Washizu puts up **20 million yen** (100,000 yen per 100
-points), and Akagi stakes **his own blood** — 2,000cc, the "vampire rules" — which is
-why playing safe is not an option for him: shrinking away means bleeding out through
-tenpai payments and the score difference. That part is not implemented here: this
-version plays for points only, nobody is "out", and the match is decided by the duel
-between the two geniuses, as in the story. The story's match is said to have lasted
-21 years; the longest game here is about 4½ hours.
+**The stakes.** In the story Washizu puts up **20 million yen**, and Akagi stakes
+**his own blood** — 2,000cc, the "vampire rules" — which is why playing safe is not an
+option for him: shrinking away means bleeding out. Two-against-two tables can carry
+those stakes: **low**, where the 2,000cc is worth 200,000 points, or **high**, where it
+is worth 20,000 — the ratio of the story itself. With the stakes on, every point
+that passes *directly* between Akagi and Washizu is paid out the moment the hand ends:
+when Washizu takes points Akagi bleeds, and when Akagi is ahead his player chooses to
+take the yen or to transfuse the lost blood (it comes back as far as it can, down to
+0cc, the remainder becoming yen). At the end of each hanchan the part of the
+Akagi-minus-Washizu difference not yet paid is settled the same way. If at any moment
+more than 2,000cc has been lost, Akagi dies and the game ends at once: Washizu's team
+wins, and otherwise Akagi's team wins the match by surviving. Free-for-all tables and
+no-stake tables play for points only, as before; nobody is "out" for going negative.
+The story's match is said to have lasted 21 years; the longest game here is about
+4½ hours.
 
 Everything else is standard riichi mahjong.
 
@@ -108,8 +116,8 @@ instances that share only that Redis, including a player switching instance mid-
 The host chooses the mode when creating a table. The mahjong rules are the same in
 both; only how the game ends and how it is scored differ.
 
-- **Two against two** (the default) — the story's match: Akagi & Yasuoka against
-  Washizu & Suzuki, with hanchan settlements. See "Roles and teams" below.
+- **Two against two** (the default) — the story's match: Akagi, backed by Yasuoka, against
+  Washizu, backed by Suzuki, with hanchan settlements. See "Roles and teams" below.
 - **Free-for-all** — everyone plays for themselves:
   - There are no hanchan settlements. The game ends after its last scheduled hand, and
     unclaimed riichi sticks go to the winner.
@@ -125,11 +133,12 @@ both; only how the game ends and how it is scored differ.
 - Each seat is a fixed role, in play order: 0 Akagi, 1 Yasuoka, 2 Washizu, 3 Suzuki.
   In the waiting room a player picks their role by taking the seat; Akagi deals first.
   The roles are the same in free-for-all, where they decide a tied top score.
-- Teams are the adjacent pairs: Akagi & Yasuoka against Washizu & Suzuki.
+- The teams are the adjacent pairs, each led by its genius: Akagi with Yasuoka at his
+  side, against Washizu with Suzuki at his side.
 - Every player scores as in ordinary riichi mahjong, starting on 25,000. A team's
   total is the sum of its two players.
-- When the game ends, Akagi & Yasuoka win if Akagi has more points than Washizu;
-  otherwise Washizu & Suzuki win. A tie goes to Washizu & Suzuki, so there are no
+- When the game ends, Akagi's team wins if Akagi has more points than Washizu;
+  otherwise Washizu's team wins. A tie goes to Washizu's team, so there are no
   drawn games.
 - Except in East-only games, the places are settled at the end of every hanchan:
   1st to 4th are paid +30,000, +10,000, −10,000, −30,000 (20,000 apart, zero-sum).

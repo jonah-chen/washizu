@@ -4,11 +4,19 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const W = ['East', 'South', 'West', 'North'], WK = '東南西北';
 const SUIT = ['characters', 'circles', 'bamboo'], HON = ['East wind', 'South wind', 'West wind', 'North wind', 'White dragon', 'Green dragon', 'Red dragon'];
-// The four fixed roles, in play order (seat 0 deals first). Akagi & Yasuoka are partners,
-// as are Washizu & Suzuki. Akagi & Yasuoka win if Akagi outpoints Washizu at the end.
+// The four fixed roles, in play order (seat 0 deals first). Akagi and Washizu lead the two
+// teams, with Yasuoka and Suzuki at their sides. Akagi's team wins if Akagi outpoints Washizu.
 const ROLE = ['Akagi', 'Yasuoka', 'Washizu', 'Suzuki'];
-const TEAM = ['Akagi & Yasuoka', 'Washizu & Suzuki'];
+const TEAM = ['Akagi', 'Washizu'];
 const LEN = { east: 'East round only', south: 'East and South', hanchan2: '2 hanchan', hanchan4: '4 hanchan', hanchan6: '6 hanchan' };
+// The story's bet: Washizu's 20 million yen for 2,000cc of Akagi's blood, worth the table's
+// whole stake in points. Low stakes spread the blood over 200,000 points, high over 20,000.
+const STAKE = {
+  none: { label: 'No stake', pts: 0 },
+  low: { label: 'Low stake', pts: 200000 },
+  high: { label: 'High stake', pts: 20000 },
+};
+const fmtYen = n => '¥' + Math.abs(n).toLocaleString();
 // In team games the fixed role is a player's identity, shown at full size, with the account
 // name as a smaller label after it. Free-for-all has no roles, so the account name stands alone.
 const who = (p, s, mode) => mode === 'ffa' ? esc(p.name) : `${ROLE[s]} <span class="un">${esc(p.name)}</span>`;
@@ -16,7 +24,7 @@ const who = (p, s, mode) => mode === 'ffa' ? esc(p.name) : `${ROLE[s]} <span cla
 const S = {
   me: null, lobby: { tables: [], online: 0 }, table: null, game: null, board: [],
   screen: null, authMode: 'login', sel: null, riichiMode: false, flash: null, evN: 0,
-  offset: 0, timer: null, closed: false,
+  offset: 0, timer: null, closed: false, payN: 0, payFlash: null,
 };
 let ws = null, retry = 0;
 
@@ -81,7 +89,15 @@ function onTable(m) {
     if (g.deadline) {
       if (!S.timer || S.timer.deadline !== g.deadline) S.timer = { deadline: g.deadline, total: Math.max(1, g.deadline - (Date.now() + S.offset)) };
     } else S.timer = null;
-  } else { S.evN = 0; S.timer = null; }
+    // a fresh payment under the stakes: a banner for a few seconds (joiners see past payments quietly)
+    if (g.lastPayment) {
+      if (!S.payN) S.payN = g.lastPayment.n;
+      else if (g.lastPayment.n > S.payN) {
+        S.payN = g.lastPayment.n; S.payFlash = { pay: g.lastPayment, until: Date.now() + 5200 };
+        setTimeout(() => { if (S.screen === 'game') drawGame(); }, 5300);
+      }
+    }
+  } else { S.evN = 0; S.timer = null; S.payN = 0; S.payFlash = null; }
   if (!S.table && !wasLobby) refreshMe();
   render();
 }
@@ -124,7 +140,7 @@ function render() {
   if (screen !== S.screen) {
     S.screen = screen;
     $('#app').innerHTML = shells[screen]();
-    if (screen === 'lobby') refreshMe();
+    if (screen === 'lobby') { refreshMe(); syncCreateForm(); }
   }
   ({ auth: drawAuth, lobby: drawLobby, room: drawRoom, game: drawGame, closed: () => {} })[screen]();
 }
@@ -142,8 +158,9 @@ const shells = {
   closed: () => `<main class="auth"><div><h1>Washizu Mahjong</h1><p class="lede">This account is now open in another window. Close that one, then reload this page to play here.</p></div></main>`,
   auth: () => `<main class="auth">
     <div>
+      <img class="banner" src="/assets/homepage2.png" alt="The story's table: the blood pump beside the crystal tiles, Washizu across the felt" draggable="false">
       <h1>Washizu Mahjong</h1>
-      <p class="lede">The crystal-tile mahjong Washizu Iwao invented in <i>Akagi</i> — Akagi and Yasuoka against Washizu and Suzuki. In the story Akagi stakes his own blood; here you play for points only.</p>
+      <p class="lede">The crystal-tile mahjong Washizu Iwao invented in <i>Akagi</i> — Akagi, backed by Yasuoka, against Washizu, backed by Suzuki. On a two-against-two table you can play the story's own stakes: 20 million yen against 2,000cc of Akagi's blood, where more than 2,000cc lost ends him — or keep the table for points alone.</p>
       <div class="quad" aria-hidden="true">${tile(13 * 4 + 1)}${tile(13 * 4 + 2)}${tile(13 * 4 + 3)}${tile(13 * 4)}</div>
       <p class="quadnote">Three of every four tiles are glass. The whole table can read them, in your hand and in everyone else's. Only the fourth stays private.</p>
     </div>
@@ -162,24 +179,30 @@ const shells = {
         <form id="createform" class="card">
           <label>Table name<input type="text" id="tn" maxlength="30" placeholder="Optional"></label>
           <label>Mode<select id="tm"><option value="team" selected>Two against two</option><option value="ffa">Free-for-all</option></select></label>
-          <label>Length<select id="tl"><option value="east">East round only (about 20 minutes)</option><option value="south">East and South (about 45 minutes)</option><option value="hanchan2">2 hanchan (about 90 minutes)</option><option value="hanchan4">4 hanchan (about 3 hours)</option><option value="hanchan6">6 hanchan (about 4½ hours)</option></select></label>
+          <label>Length<select id="tl"><option value="east" class="ffaonly">East round only (about 20 minutes)</option><option value="south">East and South (about 45 minutes)</option><option value="hanchan2">2 hanchan (about 90 minutes)</option><option value="hanchan4">4 hanchan (about 3 hours)</option><option value="hanchan6">6 hanchan (about 4½ hours)</option></select></label>
           <label>Time per turn<select id="tt"><option value="15">15 seconds</option><option value="30" selected>30 seconds</option><option value="60">60 seconds</option></select></label>
+          <label id="stakelabel">The stakes<select id="ts" title="A team game only: every point that passes directly between Akagi and Washizu is paid out in blood and money.">
+            <option value="none" selected>None — points only</option>
+            <option value="low">Low — 20 million yen for 2,000cc of blood, over 200,000 points</option>
+            <option value="high">High — 20 million yen for 2,000cc of blood, over 20,000 points</option>
+          </select></label>
+          <p class="muted" id="stakenote" style="font-size:.85rem;margin:-.4rem 0 1rem">Akagi's blood is drawn as the direct exchanges against Washizu are paid. More than 2,000cc lost and he dies, the game over at once; surviving it wins his team the match. Free-for-all tables always play for points only.</p>
           <button class="btn primary">Create table</button>
         </form></section>
     </div><div>
       <section><h2>Your record</h2><div id="record"></div></section>
       <section><h2>Leaderboard</h2><div id="board"></div></section>
       <section class="rules"><h2>The story and the rules</h2>
-        <p class="muted">Washizu Mahjong (와시즈 마작) is the special riichi game Washizu Iwao invented in Nobuyuki Fukumoto's <i>Akagi</i>. Washizu is the "king of the gambling world," whose left hand is said to be godlike and never to lose — and this game is the one he set, on his own house rules, for the greatest gambler in the country. <b>Washizu and Suzuki</b> play against <b>Akagi and Yasuoka</b>, over crystal tiles.</p>
-        <p class="muted">Washizu stakes 20 million yen; Akagi stakes his own blood — 2,000cc, the "vampire rules" — so the more he loses, the more he bleeds, and playing it safe is no shelter. This table plays the mahjong only: no money, no blood, just points. The story's match is said to have lasted 21 years. <a href="https://en.namu.wiki/w/%EC%99%80%EC%8B%9C%EC%A6%88%20%EB%A7%88%EC%9E%91" target="_blank" rel="noopener">The story and its rules</a>.</p>
+        <p class="muted">Washizu Mahjong (와시즈 마작) is the special riichi game Washizu Iwao invented in Nobuyuki Fukumoto's <i>Akagi</i>. Washizu is the "king of the gambling world," whose left hand is said to be godlike and never to lose — and this game is the one he set, on his own house rules, for the greatest gambler in the country. <b>Washizu</b>, backed by <b>Suzuki</b>, plays against <b>Akagi</b>, backed by <b>Yasuoka</b>, over crystal tiles.</p>
+        <p class="muted">Washizu stakes 20 million yen; Akagi stakes his own blood — 2,000cc, the "vampire rules" — so the more he loses, the more he bleeds, and playing it safe is no shelter. On a two-against-two table you can set the story's stakes on the table — low, where 2,000cc is worth 200,000 points, or high, where it is worth 20,000, the ratio of the story itself. Then every point that passes directly between Akagi and Washizu is paid out in blood and money the moment the hand ends; if at any moment more than 2,000cc has been lost, Akagi dies and the game is over at once, and otherwise his team wins the match by surviving. Free-for-all tables play for points only. The story's match is said to have lasted 21 years. <a href="https://en.namu.wiki/w/%EC%99%80%EC%8B%9C%EC%A6%88%20%EB%A7%88%EC%9E%91" target="_blank" rel="noopener">The story and its rules</a>.</p>
         <details open><summary>The rules, in eight lines</summary><ul>
           <li><strong>Crystal tiles.</strong> Each tile has four copies: three are transparent crystal — visible to the whole table, in your hand and in everyone else's — and the fourth is solid, showing only its back in a hand. Washizu ground the crystal set himself: every tile can be read, and that is exactly what binds you.</li>
           <li><strong>The hole.</strong> There is no wall to track. The 136 tiles are machine-shuffled and drawn at random, one at a time, from a bag standing in for the hole in the middle of the story's table. A hand ends in a draw after 70 draws.</li>
           <li><strong>Everything else is riichi mahjong.</strong> You need a yaku to win. Riichi, ippatsu, dora, ura dora, kan dora and furiten all apply. Open tanyao is allowed.</li>
-          <li><strong>The seats.</strong> Four fixed roles, played in the order Akagi → Yasuoka → Washizu → Suzuki, and you pick your role by taking its seat. In two-against-two games Akagi &amp; Yasuoka play against Washizu &amp; Suzuki; you cannot see your partner's solid tiles, and you may win off your partner's discard.</li>
+          <li><strong>The seats.</strong> Four fixed roles, played in the order Akagi → Yasuoka → Washizu → Suzuki, and you pick your role by taking its seat. In two-against-two games Akagi and Washizu lead the teams, backed by Yasuoka and Suzuki; you cannot see your partner's solid tiles, and you may win off your partner's discard.</li>
           <li><strong>The modes.</strong> When starting a table you choose two-against-two — the story's match — or free-for-all, where everyone plays for themselves. In free-for-all there are no hanchan settlements and the game ends after its last hand; the highest total wins, a tie going to the lower seat, so there are no drawn games.</li>
-          <li><strong>Winning.</strong> Everyone scores as usual from 25,000 and nobody is out for going negative. In two-against-two, when the game ends the match belongs to whichever of Akagi and Washizu has more points — the duel between the two geniuses decides it (a tie goes to Washizu's side). If several players can ron the same discard, only the one nearest the discarder in turn order wins; the others get nothing.</li>
-          <li><strong>Lengths and hanchan scoring.</strong> East round only, East and South, or 2, 4 or 6 hanchan — a hanchan is an East round followed by a South round, and there are no West or North rounds. The longest game here is about 4½ hours. In two-against-two, except in East-only games, at the end of each hanchan the places are paid as in the story: +30,000, +10,000, −10,000, −30,000 for 1st to 4th.</li>
+          <li><strong>Winning.</strong> Everyone scores as usual from 25,000 and nobody is out for going negative. In two-against-two, when the game ends the match belongs to whichever of Akagi and Washizu has more points — the duel between the two geniuses decides it (a tie goes to Washizu's side). On a staked table the stakes decide instead: if Akagi has lost more than 2,000cc at any moment he is dead and Washizu's team wins at once; otherwise Akagi's team wins by surviving. If several players can ron the same discard, only the one nearest the discarder in turn order wins; the others get nothing.</li>
+          <li><strong>Lengths and hanchan scoring.</strong> Free-for-all plays East round only or East and South; two-against-two plays East and South or 2, 4 or 6 hanchan — a hanchan is an East round followed by a South round, and there are no West or North rounds. The longest game here is about 4½ hours. In two-against-two, at the end of each hanchan the places are paid as in the story: +30,000, +10,000, −10,000, −30,000 for 1st to 4th.</li>
           <li><strong>Clock.</strong> If your time runs out, the tile you drew is discarded and calls are passed.</li>
         </ul></details></section>
     </div></main>`,
@@ -218,7 +241,7 @@ function drawLobby() {
   $('#tables').innerHTML = L.tables.length ? L.tables.map(t => `<div class="trow">
       <div class="pips" aria-label="${t.seats.filter(Boolean).length} of 4 seats taken">${[0, 1, 2, 3].map(i => `<span class="pip ${t.seats[i] ? 'full' : ''} ${i === 1 ? 'gap' : ''}" title="${ROLE[i]}"></span>`).join('')}</div>
       <div class="grow"><div class="tname">${esc(t.name)}</div><div class="who">${LEN[t.length] || LEN.east}, ${t.turnSec}s turns. ${t.mode === 'ffa' ? 'Free-for-all: each player for themselves' : `${esc(TEAM[0])} (${side(t, 0)}) against ${esc(TEAM[1])} (${side(t, 1)})`}</div></div>
-      ${t.mode === 'ffa' ? '<span class="tag">Free-for-all</span>' : ''}${t.playing ? '<span class="tag">In play</span>' : t.seats.every(Boolean) ? '<span class="tag">Full</span>' : `<button class="btn small" data-act="join" data-table="${t.id}">Take a seat</button>`}
+      ${t.mode === 'ffa' ? '<span class="tag">Free-for-all</span>' : (t.stake && t.stake !== 'none') ? `<span class="tag bet" title="20 million yen for 2,000cc of Akagi's blood — ${STAKE[t.stake].pts.toLocaleString()} points">${STAKE[t.stake].label}</span>` : ''}${t.playing ? '<span class="tag">In play</span>' : t.seats.every(Boolean) ? '<span class="tag">Full</span>' : `<button class="btn small" data-act="join" data-table="${t.id}">Take a seat</button>`}
     </div>`).join('') : '<p class="empty">No tables are open. Start one below and three more players can join it.</p>';
   $('#record').innerHTML = st.games ? `<dl class="facts"><dt>Rating</dt><dd>${st.rating}</dd><dt>Games</dt><dd>${st.games}</dd>
       <dt>Wins</dt><dd>${st.wins}</dd></dl>` : `<p class="muted">Rating ${st.rating}. Finish a game to start your record.</p>`;
@@ -232,7 +255,8 @@ function drawRoom() {
   const n = t.seats.filter(Boolean).length;
   $('#rname').textContent = t.name;
   const ffa = t.mode === 'ffa';
-  $('#rmeta').textContent = `${LEN[t.length] || LEN.east}, ${t.turnSec} seconds per turn. ${ffa ? 'Free-for-all: everyone plays for themselves, and the highest total at the end wins.' : `Each seat is a fixed role: ${TEAM[0]} team up, and so do ${TEAM[1]}.`} Turns go Akagi, Yasuoka, Washizu, Suzuki; Akagi deals first.`;
+  const bet = !ffa && t.stake && t.stake !== 'none' ? ` The stakes are on: 20 million yen for 2,000cc of Akagi's blood, worth ${STAKE[t.stake].pts.toLocaleString()} points. More than 2,000cc lost ends Akagi — and the game — at once.` : '';
+  $('#rmeta').textContent = `${LEN[t.length] || LEN.east}, ${t.turnSec} seconds per turn. ${ffa ? 'Free-for-all: everyone plays for themselves, and the highest total at the end wins.' : `Each seat is a fixed role: ${TEAM[0]} and ${TEAM[1]} lead the teams, with Yasuoka and Suzuki at their sides.`} Turns go Akagi, Yasuoka, Washizu, Suzuki; Akagi deals first.${bet}`;
   const seat = i => { const s = t.seats[i], part = s ? t.seats[i ^ 1] : null; return s
     ? `<div class="seat ${s.ready ? 'rdy' : ''}"><div class="sn">${esc(s.name)}${s.name === S.me.name ? ' (you)' : ''}</div><div class="ss">${!s.online ? 'Disconnected' : s.ready ? 'Ready' : 'Not ready'} · ${ROLE[i]}${part && !ffa ? `, partner ${esc(part.name)}` : ''}</div></div>`
     : `<div class="seat open"><div class="sn">${ROLE[i]}</div><button class="btn small" data-act="seat" data-i="${i}">Play as ${ROLE[i]}</button></div>`; };
@@ -243,6 +267,38 @@ function drawRoom() {
   b.classList.toggle('primary', !(mine && mine.ready));
   $('#rstatus').textContent = n < 4 ? `${4 - n} more ${4 - n === 1 ? 'player is' : 'players are'} needed. The game starts when all four are ready.` : 'The game starts when all four players are ready.';
   drawChat();
+}
+
+/* ---------- the stakes ---------- */
+// The stakes as they stand: eight tubes of 250cc hold the 2,000cc of the story, and the
+// money Akagi's side has taken. g.stake is null on tables without the stakes.
+function stakeBox(g) {
+  if (!g.stake) return '';
+  const { pts, blood, money, dead } = g.stake;
+  const tubes = [0, 1, 2, 3, 4, 5, 6, 7].map(i => {
+    const f = Math.max(0, Math.min(1, (blood - i * 250) / 250));
+    return `<span class="tube" title="${(i * 250).toLocaleString()}–${((i + 1) * 250).toLocaleString()}cc"><i style="height:${(f * 100).toFixed(1)}%"></i></span>`;
+  }).join('');
+  const notes = Math.round(money / 10000);
+  return `<div class="stakebox">
+    <div class="sbhead">The stakes · ${STAKE[g.stake.level].label} <span class="muted">— 20,000,000 yen for 2,000cc, worth ${pts.toLocaleString()} points</span></div>
+    <div class="sbrow">
+      <div class="tubes" title="The blood lost so far">${tubes}</div>
+      <div class="sbstat"><b class="${dead ? 'dead' : ''}">${dead ? 'Akagi is dead' : blood.toLocaleString() + 'cc lost'}</b><span class="muted">of the 2,000cc${dead ? '' : ' he can lose'}</span></div>
+    </div>
+    <div class="sbrow">
+      <img class="bill" src="/assets/bill10000.jpg" alt="A 10,000 yen note" draggable="false">
+      <div class="sbstat"><b>${fmtYen(money)}</b><span class="muted">${notes.toLocaleString()} notes of 10,000 yen${money ? ", in Akagi's hand" : ', not taken yet'}</span></div>
+    </div>
+  </div>`;
+}
+// The words on the payment banner. lastPayment: { dir, cc, choice, transfused, money, blood }.
+function payFlashText(p, dead) {
+  if (p.dir < 0) return dead
+    ? `Blood drawn — ${p.cc.toLocaleString()}cc. That is more than 2,000cc: Akagi is dead, and the game is over.`
+    : `Blood drawn — ${p.cc.toLocaleString()}cc for ${p.points.toLocaleString()} points. ${p.blood.toLocaleString()}cc is now lost.`;
+  if (p.choice === 'transfuse') return `Transfused — ${p.transfused.toLocaleString()}cc of the lost blood comes back${p.transfused < p.cc ? `, the other ${(p.cc - p.transfused).toLocaleString()}cc becomes ${fmtYen(p.money)}` : ''}. ${p.blood.toLocaleString()}cc is still lost.`;
+  return `Money taken — ${fmtYen(p.money)} for ${p.points.toLocaleString()} points.`;
 }
 
 /* ---------- the table ---------- */
@@ -290,11 +346,14 @@ function drawGame() {
   const btn = (t, extra) => tile(t, { btn: true, disabled: !allowed.includes(t), cls: (myTurn && !allowed.includes(t) ? 'dim ' : '') + (S.sel === t ? 'sel ' : '') + (extra || '') });
   const hand = handTiles.map(t => btn(t)).join('') + (g.drawn != null ? btn(g.drawn, 'drawn') : '') + mine.melds.map(meld).join('');
 
+  const pf = g.stake && S.payFlash && S.payFlash.until > Date.now() ? payFlashText(S.payFlash.pay, g.stake.dead) : '';
   el.innerHTML = `
+    ${pf ? `<div class="payflash ${S.payFlash.pay.dir < 0 ? 'blood' : 'money'}" role="status">${pf}</div>` : ''}
     <div class="opps">${opp((me + 3) % 4)}${opp((me + 2) % 4)}${opp((me + 1) % 4)}</div>
     <div class="mid">
       <div class="info"><h3>${W[g.roundWind]} ${g.kyoku + 1}</h3>
         <dl class="facts">${g.mode === 'ffa' ? `<dt>Leaders</dt><dd>${leaders(P)}</dd>` : `<dt>Akagi vs Washizu</dt><dd>${P[0].score.toLocaleString()} · ${P[2].score.toLocaleString()}</dd>`}<dt>Hanchan</dt><dd>${g.hanchan} of ${g.hanchans}</dd><dt>Draws left</dt><dd>${g.drawsLeft}</dd><dt>Repeat counters</dt><dd>${g.honba}</dd><dt>Riichi sticks on table</dt><dd>${g.sticks}</dd></dl>
+        ${stakeBox(g)}
         <div class="muted" style="font-size:.85rem;margin-bottom:4px">Dora indicators</div><div class="tiles">${g.dora.map(t => tile(t)).join('')}</div>
         <div class="timer"><span id="tbar"></span></div><p class="status">${esc(status)}</p></div>
       <div class="mine"><div class="muted" style="font-size:.85rem;margin-bottom:6px">Your discards</div><div class="pond">${pond(mine.pond, last)}</div></div>
@@ -320,10 +379,26 @@ function overlay(g) {
       : `<h2>${f.winner === myTeam ? 'Your team wins' : 'Your team loses'}</h2>
         ${f.teams.map(tm => `<div class="win"><div class="teamline"><b>${esc(TEAM[tm.team])}${tm.team === myTeam ? ' (your team)' : ''}</b><span class="total">${tm.total.toLocaleString()}</span></div>
           <div class="rank">${tm.members.map(m => `<span><b>${who(m, m.seat, 'team')}</b></span><span>${m.score.toLocaleString()}</span>`).join('')}</div></div>`).join('')}
-        <p class="muted" style="margin-top:14px">Akagi ${f.decider[0].toLocaleString()} against Washizu ${f.decider[1].toLocaleString()} — ${f.winner === 0 ? 'Akagi leads, so' : 'Washizu is not behind, so'} ${esc(TEAM[f.winner])} take the game.</p>`;
+        ${f.stake ? `<div style="margin-top:14px">${stakeBox(g)}</div>
+        <p class="muted" style="margin-top:10px">${f.stake.dead ? `Akagi lost ${f.stake.blood.toLocaleString()}cc — more than the 2,000cc the stakes allow — so he is dead, and the ${esc(TEAM[1])} team takes the game. ${fmtYen(f.stake.money)} had changed hands before the end.` : `Akagi survived the match with ${f.stake.blood.toLocaleString()}cc of the 2,000cc lost, so his team takes the game. The money stands at ${fmtYen(f.stake.money)}.`}</p>`
+        : `<p class="muted" style="margin-top:14px">Akagi ${f.decider[0].toLocaleString()} against Washizu ${f.decider[1].toLocaleString()} — ${f.winner === 0 ? 'Akagi leads, so' : 'Washizu is not behind, so'} the ${esc(TEAM[f.winner])} team takes the game.</p>`}`;
     return `<div class="overlay"><div class="sheet">${head}
       <p class="muted" style="margin-top:8px">${t.seats.filter(s => s && s.ready).length} of 4 ready for another game with the same roles.</p>
       <div class="rowbtns" style="margin-top:14px"><button class="btn ${mine && mine.ready ? '' : 'primary'}" data-act="ready">${mine && mine.ready ? 'Cancel ready' : 'Play again'}</button><button class="btn" data-act="regroup">Change roles</button><button class="btn" data-act="leave">Leave table</button></div>
+    </div></div>`;
+  }
+  if (g.phase === 'settle') {
+    const st = g.settle, iAmAkagi = g.seat === 0;
+    return `<div class="overlay"><div class="sheet">
+      <h2>The stakes are settled</h2>
+      <p>${st.points.toLocaleString()} points are being settled between Akagi and Washizu — as ${fmtYen(st.yen)}, or as ${st.cc.toLocaleString()}cc of blood.</p>
+      ${stakeBox(g)}
+      ${iAmAkagi ? `<div class="rowbtns" style="margin-top:14px">
+        <button class="btn primary" data-act="settle" data-c="money">Take ${fmtYen(st.yen)}</button>
+        <button class="btn" data-act="settle" data-c="transfuse" title="The lost blood comes back as far as it can, down to 0cc; anything beyond comes back as yen.">Transfuse ${st.cc.toLocaleString()}cc <span class="muted">(${st.transfused.toLocaleString()}cc back · ${fmtYen(st.restYen)} the rest)</span></button>
+      </div>
+      <p class="muted" style="margin-top:10px;font-size:.85rem">If the clock runs out, the yen are taken.</p>`
+      : `<p class="muted" style="margin-top:10px">Waiting for <b>${esc(P[0].name)}</b> — the one who plays Akagi — to choose.</p>`}
     </div></div>`;
   }
   if (g.phase !== 'ended' || !r) return '';
@@ -348,7 +423,7 @@ function overlay(g) {
   const order = [g.seat, g.seat ^ 1, ...[0, 1, 2, 3].filter(s => s !== g.seat && s !== (g.seat ^ 1))];
   return `<div class="overlay"><div class="sheet"><h2>${title}</h2>${body}
     <div class="deltas">${order.map(s => { const p = P[s]; return `<div class="${g.mode !== 'ffa' && Math.floor(s / 2) === Math.floor(g.seat / 2) ? 'ours' : ''}"><b>${who(p, s, g.mode)}</b><span class="${r.deltas[s] > 0 ? 'plus' : r.deltas[s] < 0 ? 'minus' : ''}">${r.deltas[s] > 0 ? '+' : ''}${r.deltas[s].toLocaleString()}</span><br>${p.score.toLocaleString()}</div>`; }).join('')}</div>
-    <p class="muted" style="margin-bottom:14px">${g.mode === 'ffa' ? leaders(P) + '.' : `Akagi ${P[0].score.toLocaleString()} vs Washizu ${P[2].score.toLocaleString()}.`}</p>
+    <p class="muted" style="margin-bottom:14px">${g.mode === 'ffa' ? leaders(P) + '.' : `Akagi ${P[0].score.toLocaleString()} vs Washizu ${P[2].score.toLocaleString()}.${g.stake ? ` The stakes so far: ${g.stake.blood.toLocaleString()}cc lost, ${fmtYen(g.stake.money)} taken.` : ''}`}</p>
     <button class="btn primary" data-act="next" ${ready ? 'disabled' : ''}>${ready ? 'Waiting for the others' : 'Continue'}</button>
   </div></div>`;
 }
@@ -384,7 +459,27 @@ document.addEventListener('click', async e => {
   else if (a === 'tsumo') sendMsg({ t: 'act', a: 'tsumo' });
   else if (a === 'ankan' || a === 'kakan') sendMsg({ t: 'act', a, kind: +t.dataset.kind });
   else if (a === 'claim') sendMsg({ t: 'act', a: 'claim', c: t.dataset.c, i: t.dataset.i != null ? +t.dataset.i : undefined });
+  else if (a === 'settle') sendMsg({ t: 'act', a: 'settle', c: t.dataset.c });
   else if (a === 'next') sendMsg({ t: 'act', a: 'next' });
+});
+
+// A free-for-all table always plays for points, and East-only is its length: the create form
+// follows the mode it is given. Runs whenever the lobby is drawn and whenever the mode moves.
+function syncCreateForm() {
+  const tm = $('#tm');
+  if (!tm) return;
+  const team = tm.value === 'team';
+  const east = $('#tl option.ffaonly');
+  if (east) east.hidden = team;
+  if (team && $('#tl').value === 'east') $('#tl').value = 'south';
+  $('#stakelabel').hidden = !team;
+  $('#stakenote').hidden = !team;
+  const ts = $('#ts');
+  ts.disabled = !team;
+  if (!team) ts.value = 'none';     // free-for-all never carries the stakes
+}
+document.addEventListener('change', e => {
+  if (e.target && e.target.id === 'tm') syncCreateForm();
 });
 
 document.addEventListener('submit', async e => {
@@ -399,7 +494,7 @@ document.addEventListener('submit', async e => {
     } catch (x) { err.textContent = x.message; }
     go.disabled = false;
   } else if (f.id === 'createform') {
-    sendMsg({ t: 'create', name: $('#tn').value, mode: $('#tm').value, length: $('#tl').value, turnSec: +$('#tt').value });
+    sendMsg({ t: 'create', name: $('#tn').value, mode: $('#tm').value, length: $('#tl').value, turnSec: +$('#tt').value, stake: $('#tm').value === 'team' ? $('#ts').value : 'none' });
   } else if (f.id === 'chatform') {
     const i = $('#chatin');
     if (i.value.trim()) sendMsg({ t: 'chat', text: i.value });

@@ -122,7 +122,7 @@ assert.ok(g.tempFuriten[1], 'the nearer seat that let it go is furiten');
   assert.strictEqual(g2.phase, 'claim');
   assert.ok(!g2.fakeClaim);
   assert.deepStrictEqual(Object.keys(g2.pending.opts), ['1'], 'only the chi caller is offered a call');
-  assert.ok(g2.deadline - t1 <= 30000 && g2.deadline - t1 >= 29000, 'a real claim gets the full play-time clock');
+  assert.ok(g2.deadline - t1 <= 30000 + 5 && g2.deadline - t1 >= 0, 'a real claim gets a randomized play-time clock, never more than the turn time');
   assert.strictEqual(g2.view(1).claim.chi.length, 1);
   assert.ok(!g2.view(2).claim, 'the other seats get no call');
 
@@ -246,4 +246,114 @@ assert.strictEqual(Game.fromJSON(JSON.parse(JSON.stringify(gffb))).mode, 'ffa');
 assert.strictEqual(Game.fromJSON({ players: [] }).mode, 'team');
 // an unknown mode is treated as a team game
 assert.strictEqual(new Game({ players: [0, 1, 2, 3].map(i => ({ key: 'p' + i, name: 'P' + i })), noTimers: true, mode: 'duel' }).mode, 'team');
+
+// ---- East-only is a free-for-all length: team games start with East + South ----
+const P4 = [0, 1, 2, 3].map(i => ({ key: 'p' + i, name: 'P' + i }));
+assert.strictEqual(new Game({ players: P4, length: 'east', noTimers: true }).length, 'south');
+assert.strictEqual(new Game({ players: P4, length: 'east', mode: 'ffa', noTimers: true }).length, 'east');
+assert.strictEqual(new Game({ players: P4, length: 'east', mode: 'ffa', stake: 'high', noTimers: true }).stake, 'none', 'free-for-all never carries the stake');
+
+// ---- the stake: 20 million yen for 2,000cc of blood, paid in blood and money ----
+const sRon = (from, seat, pay) => ({ type: 'ron', deltas: [0, 0, 0, 0].map((_, s) => (s === from ? -pay : s === seat ? pay : 0)), from, winners: [{ seat, total: pay, yaku: [['Riichi', 1]], base: pay, hand: [], melds: [] }] });
+const sDraw = () => ({ type: 'draw', deltas: [0, 0, 0, 0], winners: [], tenpai: [false, false, false, false] });
+// a direct ron of 5,000 between the two: the difference moves by 10,000, so at high stakes
+// (2,000cc per 20,000 points) that is 1,000cc drawn from Akagi, with no choice to be made
+{
+  const g = new Game({ players: P4, length: 'south', stake: 'high', noTimers: true });
+  g.startHand();
+  g.endHand(sRon(0, 2, 5000));
+  assert.deepStrictEqual(g.winSettle, { points: 10000, dir: -1 });
+  g.next();
+  assert.strictEqual(g.bloodLost, 1000); assert.strictEqual(g.money, 0); assert.strictEqual(g.paidDiff, -10000);
+  assert.strictEqual(g.lastPayment.cc, 1000);
+}
+// the same ron won by Akagi: the Akagi player chooses; the view offers the choice in yen and cc
+{
+  const g = new Game({ players: P4, length: 'south', stake: 'high', noTimers: true });
+  g.startHand();
+  g.endHand(sRon(2, 0, 5000));
+  g.next();
+  assert.strictEqual(g.phase, 'settle');
+  assert.deepStrictEqual(g.view(0).settle, { points: 10000, yen: 10000000, cc: 1000, transfused: 0, restYen: 10000000 });
+  assert.ok(g.view(1).settle, 'the choice is visible to the whole table');
+  assert.strictEqual(g.settleChoice(1, 'money'), 'Only the player of Akagi makes that choice.');
+  g.settleChoice(0, 'money');
+  assert.strictEqual(g.money, 10000000); assert.strictEqual(g.bloodLost, 0); assert.strictEqual(g.paidDiff, 10000);
+  assert.strictEqual(g.phase, 'action');   // the next hand is dealt
+}
+// a tsumo of 2,000 from each seat: only the slice paid between the two counts, so 4,000
+{
+  const g = new Game({ players: P4, length: 'south', stake: 'low', noTimers: true });
+  g.startHand();
+  g.endHand({ type: 'tsumo', deltas: [-2000, -2000, 6000, -2000], winners: [{ seat: 2, total: 6000, yaku: [['Pinfu', 1]], base: 2000, hand: [], melds: [] }] });
+  assert.deepStrictEqual(g.winSettle, { points: 4000, dir: -1 });
+  g.next();
+  assert.strictEqual(g.bloodLost, 40, 'low stakes: 4,000 points is 40cc');
+}
+// transfusing: the blood lost comes back as far as it can (to 0cc) and the remainder is yen
+{
+  const g = new Game({ players: P4, length: 'south', stake: 'high', noTimers: true });
+  g.startHand();
+  g.endHand(sRon(0, 2, 5000)); g.next();      // 1,000cc lost
+  g.endHand(sRon(2, 0, 7500)); g.next();      // 1,500cc back: 1,000 transfused, 500cc worth of yen
+  assert.strictEqual(g.phase, 'settle');
+  g.settleChoice(0, 'transfuse');
+  assert.strictEqual(g.bloodLost, 0);
+  assert.strictEqual(g.money, 500 * 10000, 'the 500cc beyond what is lost comes back as yen');
+}
+// indirect points wait for the hanchan end: Akagi wins 5,000 from Suzuki, then the hanchan
+// settles the whole unpaid part of the Akagi-minus-Washizu difference (after the hanchan pay)
+{
+  const g = new Game({ players: P4, length: 'hanchan2', stake: 'high', noTimers: true });
+  g.startHand();
+  g.endHand({ type: 'ron', deltas: [5000, 0, 0, -5000], from: 3, winners: [{ seat: 0, total: 5000, yaku: [['Riichi', 1]], base: 5000, hand: [], melds: [] }] });
+  g.next();
+  assert.strictEqual(g.winSettle, null, 'winning from a partner is not a direct exchange');
+  for (let h = 0; h < 7 && g.phase !== 'settle'; h++) { g.result = sDraw(); g.next(); }
+  assert.strictEqual(g.phase, 'settle', 'the hanchan end settles the unpaid difference');
+  assert.strictEqual(g.settle.points, 45000, 'A-W after the hanchan pay: 60,000 - 15,000');
+  g.settleChoice(0, 'money');
+  assert.strictEqual(g.money, 45000000); assert.strictEqual(g.paidDiff, 45000);
+  assert.strictEqual(g.roundWind, 2, 'the game carries on into the next hanchan');
+}
+// more than 2,000cc lost at any moment: Akagi dies and the game ends at once, for his team
+{
+  const g = new Game({ players: P4, length: 'hanchan2', stake: 'high', noTimers: true });
+  g.startHand();
+  g.endHand(sRon(0, 2, 5000)); g.next();     // 1,000cc
+  g.bloodLost = 1500;                        // (more hands, more blood)
+  g.endHand(sRon(0, 2, 5000)); g.next();     // 1,000cc more: 2,500 -> dead
+  assert.strictEqual(g.dead, true);
+  assert.strictEqual(g.phase, 'over');
+  assert.strictEqual(g.final.winner, 1, 'Akagi dies: Washizu team wins');
+  assert.deepStrictEqual(g.final.stake, { level: 'high', pts: 20000, blood: 2500, money: 0, dead: true });
+}
+// finishing the game with the stake: Akagi is ahead the whole way, takes the yen, and
+// survives - so his team wins the match
+{
+  const g = new Game({ players: P4, length: 'south', stake: 'high', noTimers: true });
+  g.startHand();
+  g.endHand(sRon(2, 0, 5000));
+  g.next();                                   // Akagi is ahead: the table waits on his choice
+  assert.strictEqual(g.phase, 'settle');
+  g.settleChoice(0, 'money');
+  while (g.phase !== 'over') {                // seven more drawn hands to the end of the match
+    g.endHand(sDraw());
+    g.next();
+    if (g.phase === 'settle') g.settleChoice(0, 'money');   // the final hanchan settles the rest
+  }
+  assert.strictEqual(g.dead, false);
+  assert.strictEqual(g.final.winner, 0, 'he survived the match: Akagi team wins');
+  assert.strictEqual(g.bloodLost, 0);
+  assert.ok(g.final.stake && g.final.stake.money > 0);
+}
+// the stake and the blood survive a round trip through the shared store
+{
+  const g = new Game({ players: P4, length: 'south', stake: 'low', noTimers: true });
+  g.startHand(); g.endHand(sRon(0, 2, 5000)); g.next();
+  const back = Game.fromJSON(JSON.parse(JSON.stringify(g)));
+  assert.strictEqual(back.stake, 'low'); assert.strictEqual(back.bloodLost, 100, 'low: 10,000 points is 100cc'); assert.strictEqual(back.paidDiff, -10000);
+  assert.strictEqual(Game.fromJSON({ players: [] }).stake, 'none', 'old saves have no stake');
+  assert.strictEqual(Game.fromJSON({ players: [], stake: 'high' }).stake, 'high', 'a saved stake is restored');
+}
 console.log('engine tests passed');
