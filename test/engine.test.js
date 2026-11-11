@@ -90,6 +90,31 @@ assert.strictEqual(g.result.winners[0].seat, 3);
 assert.deepStrictEqual(g.result.deltas, [-8600, 0, 0, 9600]);
 assert.ok(g.tempFuriten[1], 'the nearer seat that let it go is furiten');
 
+// ---- the tile the current player just drew, as the table sees it: a glass tile is readable by
+//      everyone (the id goes out in every view), a solid tile is sent as null and stays private;
+//      once it is discarded there is no fresh tile at all ----
+{
+  const gf = new Game({ players: [0, 1, 2, 3].map(i => ({ key: 'p' + i, name: 'P' + i })), noTimers: true });
+  gf.startHand();
+  for (const d of [13 * 4 + 1, 13 * 4 + 0]) {              // 5p (glass) and 1p (solid)
+    gf.hands[0] = [...junkHand(), d];
+    gf.drawn = d;
+    for (const s of [0, 1, 2, 3]) {
+      const v = gf.view(s);
+      assert.strictEqual(v.fresh.seat, 0, 'the fresh tile belongs to the player whose turn it is');
+      if (d & 3) assert.strictEqual(v.fresh.id, d, 'a glass tile just drawn is readable by the whole table');
+      else assert.strictEqual(v.fresh.id, null, 'a solid tile just drawn is not readable');
+    }
+    for (const s of [1, 2, 3]) {                            // the other seats' view of seat 0's hand
+      const o = gf.view(s).players[0];
+      if (d & 3) assert.ok(o.glass.includes(d), 'the glass tile is in the readable tiles');
+      else assert.ok(!o.glass.includes(d), 'the solid tile is not in the readable tiles');
+    }
+  }
+  gf.drawn = null;                                          // the engine does this on discard
+  for (const s of [0, 1, 2, 3]) assert.ok(!gf.view(s).fresh, 'a discarded tile is no longer fresh');
+}
+
 // ---- the call wait: every discard pauses as if callers were deciding. When nobody can call
 //      the pause is a short random one that still shows the full play-time clock, so the
 //      timing never reveals that the tile was not wanted ----

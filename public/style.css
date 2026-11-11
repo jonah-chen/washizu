@@ -162,7 +162,7 @@ button.tile:disabled{cursor:default}
 .actions .btn{display:inline-flex;align-items:center;gap:8px}
 .actions .btn .tile{--w:20px;box-shadow:none}
 .myhand{display:flex;flex-wrap:wrap;align-items:flex-end;gap:calc(var(--tw)*.07);padding-top:calc(var(--tw)*.35)}
-.myhand .drawn{margin-left:calc(var(--tw)*.4)}
+.myhand .drawn,.ohand .drawn{margin-left:calc(var(--tw)*.4)}
 .hint{font-size:.82rem;color:var(--mist);margin-top:10px}
 
 /* The bottom row: your hand takes the row, the chat a fixed corner at its right. */

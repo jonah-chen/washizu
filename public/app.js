@@ -126,7 +126,7 @@ function tile(id, o = {}) {
   if (o.btn) return `<button class="${cls}" data-id="${id}" title="${esc(name)}"${o.disabled ? ' disabled' : ''}>${face}</button>`;
   return `<span class="${cls}" title="${esc(name)}">${face}</span>`;
 }
-const back = () => '<span class="tile back" title="Solid tile, face hidden"><img class="face" src="/tiles/Back.svg" alt="" aria-hidden="true" draggable="false"></span>';
+const back = (cls = '') => `<span class="tile back${cls ? ' ' + cls : ''}" title="Solid tile, face hidden"><img class="face" src="/tiles/Back.svg" alt="" aria-hidden="true" draggable="false"></span>`;
 function meld(m) {
   return `<span class="meld">${m.tiles.map(t => tile(t, { cls: m.called === t ? 'side' : '' })).join('')}</span>`;
 }
@@ -313,8 +313,23 @@ function drawGame() {
   const myTurn = g.phase === 'action' && g.turn === me;
   const opp = s => {
     const p = P[s];
+    // The tile the current player just drew sits at the right of their hand until they discard:
+    // the whole table reads glass tiles, so a glass tile goes out face-up; a solid one stays
+    // face-down. Either way it is already part of the hand, so it is taken out of its usual
+    // place first, and the hand looks normal again the moment it is discarded.
+    let glass = p.glass.slice(), hidden = p.hidden, drawn = '';
+    if (g.phase === 'action' && g.fresh && g.fresh.seat === s) {
+      if (g.fresh.id != null) {
+        const i = glass.indexOf(g.fresh.id);
+        if (i >= 0) glass.splice(i, 1);
+        drawn = tile(g.fresh.id, { cls: 'drawn' });
+      } else {
+        hidden -= 1;
+        drawn = back('drawn');
+      }
+    }
     return `<section class="opp ${g.mode !== 'ffa' && Math.floor(s / 2) === Math.floor(me / 2) ? 'ally' : ''} ${g.phase === 'action' && g.turn === s ? 'turn' : ''}">${head(p, s)}
-      <div class="tiles ohand">${p.glass.map(t => tile(t)).join('')}${back().repeat(p.hidden)}${p.melds.map(meld).join('')}</div>
+      <div class="tiles ohand">${glass.map(t => tile(t)).join('')}${back().repeat(hidden)}${drawn}${p.melds.map(meld).join('')}</div>
       <div class="pond">${pond(p.pond, last)}</div>${flash(s)}</section>`;
   };
 
