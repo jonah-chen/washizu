@@ -190,6 +190,7 @@ button.tile:disabled{cursor:default}
   .ohand{--tw:min(28px,6.2cqw)}
   .opp .pond{--tw:22px}
   .mid{grid-template-columns:minmax(0,240px) minmax(0,1fr) minmax(0,210px)}
+  .stacks li{width:18px}
   .mine .pond{--tw:26px}
   .bottom{grid-template-columns:1fr}
   .bottom .chat{height:150px}
@@ -201,6 +202,8 @@ button.tile:disabled{cursor:default}
   .opp .pond{--tw:20px;grid-template-columns:repeat(12,max-content);min-height:calc(var(--tw)*1.33)}
   .mid{grid-template-columns:1fr}
   .mine .pond{--tw:24px}
+  .stacks li{width:23px}
+  .sheet .stacks li{width:24px}
   .bottom .chat{height:140px}
   .deltas{grid-template-columns:repeat(2,1fr)}
 }
@@ -209,9 +212,10 @@ button.tile:disabled{cursor:default}
 .tag.bet{border-color:var(--lacquer-hi);color:#ffb4a8;background:rgba(197,57,44,.14)}
 
 /* The stakes as they stand: eight tubes of 250cc (the story's 2,000cc) over a picture of the
-   blood bags, and the money taken so far as a run of 10,000-yen notes. The ? in the header
-   carries the explanation that no longer fits in the box. */
-.stakebox{position:relative;border:1px solid rgba(222,85,70,.5);border-radius:8px;padding:10px 12px;
+   blood bags, and the money taken so far as a pile of stacks on a strip of the table. The ? in
+   the header carries the explanation that no longer fits in the box. It is a flex column so the
+   pile takes up whatever height the table row leaves it. */
+.stakebox{position:relative;display:flex;flex-direction:column;border:1px solid rgba(222,85,70,.5);border-radius:8px;padding:10px 12px;
   background:linear-gradient(100deg,rgba(12,8,8,.92) 45%,rgba(12,8,8,.55)),url(/assets/blood.png);
   background-size:cover;background-position:center}
 .mid .stakebox{width:240px}
@@ -221,9 +225,9 @@ button.tile:disabled{cursor:default}
 .stakeinfo:hover,.stakeinfo:focus-visible{color:var(--bone);border-color:var(--bone);outline:none}
 .staketip{display:none;position:absolute;top:50%;right:calc(100% + 10px);transform:translateY(-50%);width:230px;max-width:62vw;background:rgba(6,22,21,.98);border:1px solid var(--line-strong);border-radius:8px;padding:10px 12px;font-family:var(--ui);font-size:.8rem;font-weight:400;color:var(--mist);text-align:left;line-height:1.5;box-shadow:0 12px 32px rgba(0,0,0,.55);z-index:30}
 .stakeinfo:hover .staketip,.stakeinfo:focus-visible .staketip{display:block}
-.tubes{display:flex;gap:3px;padding:8px 2px 2px;flex:none;justify-content:center}
+.tubes{display:flex;gap:3px;padding:10px 2px 2px;flex:none;justify-content:center}
 /* each tube is a different slice of the bags, so no two look alike */
-.tube{position:relative;width:12px;height:50px;border:1px solid rgba(206,240,233,.4);border-radius:3px 3px 4px 4px;overflow:hidden;
+.tube{position:relative;width:13px;height:60px;border:1px solid rgba(206,240,233,.4);border-radius:3px 3px 4px 4px;overflow:hidden;
   background:linear-gradient(rgba(16,24,28,.55),rgba(16,24,28,.25)),url(/assets/blood.png) no-repeat;background-size:800% 100%;background-position:0% 100%}
 .tube:nth-child(2){background-position:14.3% 100%}.tube:nth-child(3){background-position:28.6% 100%}
 .tube:nth-child(4){background-position:42.9% 100%}.tube:nth-child(5){background-position:57.1% 100%}
@@ -231,10 +235,27 @@ button.tile:disabled{cursor:default}
 .tube:nth-child(8){background-position:100% 100%}
 .tube i{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(#c5392c,#7c1c13);box-shadow:inset 0 2px 3px rgba(255,255,255,.3);transition:height .5s}
 .tube::after{content:"";position:absolute;inset:0;box-shadow:inset 2px 0 3px rgba(255,255,255,.16);pointer-events:none}
-.moneybar{height:22px;margin-top:8px;border:1px solid var(--line-strong);border-radius:4px;overflow:hidden;background:rgba(0,0,0,.4)}
-.moneybar i{display:block;height:100%;width:0;background:url(/assets/bill10000.jpg) repeat-x;background-size:auto 100%;
-  box-shadow:inset 0 -8px 12px rgba(0,0,0,.4),inset 0 2px 2px rgba(0,0,0,.3);transition:width .5s}
-.sbstat{display:flex;align-items:baseline;gap:6px;margin-top:6px}
+/* the money taken: a pile of 10,000-yen stacks on a strip of the table — the side of a stack
+   is the edge of the paper, the top lies a real bill. Each stack is 2,500,000 yen. The area
+   flexes to fill the box, so the pile grows when the row has height to spare. */
+.stacks{position:relative;flex:1 1 auto;min-height:48px;margin-top:10px}
+/* the table the stacks sit on: a warm, worn strip along the bottom */
+.stacks::before{content:"";position:absolute;left:0;right:0;bottom:0;height:12px;border-radius:2px;
+  background:linear-gradient(180deg,rgba(120,84,52,.5),rgba(66,44,26,.7));
+  box-shadow:inset 0 1px 0 rgba(255,226,188,.32),inset 0 -5px 8px rgba(0,0,0,.4)}
+.stacks ul{list-style:none;margin:0;padding:0;position:absolute;left:2px;right:2px;top:0;bottom:12px;
+  display:flex;align-items:flex-end;justify-content:center;gap:2px}
+/* the side of a stack: the paper edge, its height the share of that stack already taken */
+.stacks li{position:relative;flex:none;width:23px;border-radius:1px;transition:height .5s;
+  background:repeating-linear-gradient(180deg,#f0ead9 0 1.5px,#d9d2bd 1.5px 2.2px,#c6bca2 2.2px 3px);
+  box-shadow:inset 2.5px 0 3px -1px rgba(0,0,0,.45),inset -2px 0 3px -1px rgba(0,0,0,.32),0 1px 2px rgba(0,0,0,.5)}
+.stacks li.empty{visibility:hidden}
+/* the bill on top: the note as it really is, the same width as the stack it caps */
+.stacks li b{position:absolute;left:0;bottom:100%;width:100%;aspect-ratio:700/333;
+  background:url(/assets/bill10000.jpg) center/cover;border-radius:1.5px;box-shadow:0 1px 3px rgba(0,0,0,.55)}
+.sheet .stacks{min-height:64px}
+.sheet .stacks li{width:34px}
+.sbstat{display:flex;align-items:baseline;gap:6px;margin-top:8px}
 .sbstat b{font-size:1.02rem;font-variant-numeric:tabular-nums}
 .sbstat b.dead{color:#ff9d91}
 .sbstat .muted{font-size:.78rem}
@@ -250,5 +271,5 @@ button.tile:disabled{cursor:default}
 .payflash.money::before{background-image:url(/assets/money.png)}
 @keyframes payin{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 
-@media (max-width:760px){.tube{width:9px;height:40px}.moneybar{height:18px}}
+@media (max-width:760px){.tube{width:9px;height:40px}}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01s!important;transition:none!important}}

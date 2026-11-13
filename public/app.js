@@ -271,13 +271,25 @@ function drawRoom() {
 }
 
 /* ---------- the stakes ---------- */
+// The money taken so far, as a pile on the table: eight stacks hold the full amount, each
+// stack's height is the share of that stack already taken, and a real 10,000-yen note lies on
+// top of every stack that holds bills.
+function moneyStacks(money, full) {
+  if (!full) return '';
+  let pile = '';
+  for (let i = 0; i < 8; i++) {
+    const f = Math.max(0, Math.min(1, (money / full) * 8 - i));
+    const h = f > 0 ? Math.max(12, Math.round(f * 100)) : 0;
+    pile += `<li class="stack${f > 0 ? '' : ' empty'}" style="height:${h}%"><b></b></li>`;
+  }
+  return `<div class="stacks" title="The money taken so far, out of the 20,000,000 yen at stake"><ul>${pile}</ul></div>`;
+}
 // The stakes as they stand: eight tubes of 250cc hold the 2,000cc of the story, and the
 // money Akagi's side has taken. g.stake is null on tables without the stakes.
 function stakeBox(g) {
   if (!g.stake) return '';
   const { pts, blood, money, dead } = g.stake;
   const full = STAKE[g.stake.level].yen;
-  const pct = full ? Math.max(0, Math.min(100, (money / full) * 100)) : 0;
   const tubes = [0, 1, 2, 3, 4, 5, 6, 7].map(i => {
     const f = Math.max(0, Math.min(1, (blood - i * 250) / 250));
     return `<span class="tube" title="${(i * 250).toLocaleString()}–${((i + 1) * 250).toLocaleString()}cc"><i style="height:${(f * 100).toFixed(1)}%"></i></span>`;
@@ -288,7 +300,7 @@ function stakeBox(g) {
     <div class="sbhead">The stakes<span class="stakeinfo" tabindex="0" aria-label="About the stakes">?<span class="staketip" role="tooltip">${tip}</span></span></div>
     <div class="tubes" title="The blood lost so far">${tubes}</div>
     <div class="sbstat"><b class="${dead ? 'dead' : ''}">${dead ? 'Akagi is dead' : blood.toLocaleString() + 'cc'}</b><span class="muted">${dead ? 'more than 2,000cc lost — Washizu’s team wins the match' : 'lost of the 2,000cc'}</span></div>
-    <div class="moneybar" title="The money taken so far, out of the 20,000,000 yen at stake"><i style="width:${pct.toFixed(1)}%"></i></div>
+    ${moneyStacks(money, full)}
     <div class="sbstat"><b>${fmtYen(money)}</b><span class="muted">taken so far</span></div>
   </div>`;
 }
