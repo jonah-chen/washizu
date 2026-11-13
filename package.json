@@ -5,7 +5,7 @@
     "main": "server.mjs",
   "scripts": {
     "start": "node dev.js",
-    "test": "node test/engine.test.js && node test/simulate.js && node test/entry.js && node test/e2e.js",
+    "test": "node test/engine.test.js && node test/simulate.js && node test/entry.js && node test/e2e.js && node test/turnstile.js",
     "test:redis": "node test/e2e.js"
   },
   "engines": {

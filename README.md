@@ -162,6 +162,8 @@ never reach a browser until the rules reveal them. Every action is validated on 
   The cookie is marked `Secure` on Vercel, or anywhere you set `SECURE_COOKIE=1`.
 - WebSocket connections require a valid session and a same-origin page.
 - Login attempts are limited to 30 per address every ten minutes.
+- Login and register are guarded by a Cloudflare Turnstile check when configured (below):
+  the form shows the widget and requests without a valid token are refused.
 - An account can be connected in one place at a time; opening it elsewhere closes the older one.
 
 ## Configuration
@@ -171,6 +173,7 @@ never reach a browser until the rules reveal them. Every action is validated on 
 | `REDIS_URL` or `KV_URL` | Redis connection string. Required on Vercel, optional locally |
 | `PORT` | Local only. Port to listen on, default 3000 |
 | `SECURE_COOKIE` | Local only. Set to `1` when serving over HTTPS |
+| `TURNSTILE_SECRET` | Cloudflare Turnstile secret key. When set, login and register require a valid Turnstile token; put the matching site key in `public/app.js` (`TURNSTILE_SITE`). Leave both unset to run without the check |
 
 All keys in Redis start with `gm:`, so the database can be shared with other apps.
 

@@ -210,6 +210,7 @@ button.tile:disabled{cursor:default}
 /* ---------- the stakes: blood and money (staked team tables) ---------- */
 .auth .banner{width:100%;max-width:560px;border-radius:12px;border:1px solid var(--line-strong);box-shadow:0 24px 60px rgba(0,0,0,.55);margin-bottom:1.4rem}
 .tag.bet{border-color:var(--lacquer-hi);color:#ffb4a8;background:rgba(197,57,44,.14)}
+.tsbox{margin:.35rem 0}
 
 /* The stakes as they stand: eight tubes of 250cc (the story's 2,000cc) over a picture of the
    blood bags, and the money taken so far as a pile of stacks on a strip of the table. The ? in

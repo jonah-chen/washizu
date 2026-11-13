@@ -16,6 +16,10 @@ const STAKE = {
   low: { label: 'Low stake', pts: 200000, yen: 20000000 },
   high: { label: 'High stake', pts: 20000, yen: 20000000 },
 };
+// Cloudflare Turnstile: the site key of the widget on the login form (public by design).
+// Leave it empty to run without the check; the server only enforces one when its
+// TURNSTILE_SECRET environment variable is set, so the two must be configured together.
+const TURNSTILE_SITE = '0x4AAAAAAF-8p4OI56jZ0ioB';
 const fmtYen = n => '¥' + Math.abs(n).toLocaleString();
 // In team games the fixed role is a player's identity, shown at full size, with the account
 // name as a smaller label after it. Free-for-all has no roles, so the account name stands alone.
@@ -139,11 +143,25 @@ function render() {
   const screen = S.closed ? 'closed' : !S.me ? 'auth' : S.game ? 'game' : S.table ? 'room' : 'lobby';
   if (screen !== S.screen) {
     S.screen = screen;
+    if (screen !== 'auth') tsId = null;
     $('#app').innerHTML = shells[screen]();
     if (screen === 'lobby') { refreshMe(); syncCreateForm(); }
   }
   ({ auth: drawAuth, lobby: drawLobby, room: drawRoom, game: drawGame, closed: () => {} })[screen]();
 }
+
+// The Turnstile widget on the login form. The script loads on its own, so the mount retries
+// until it arrives; tsId is the handle getResponse()/reset() need for the current widget.
+let tsId = null;
+function mountTurnstile() {
+  if (!TURNSTILE_SITE || S.screen !== 'auth') return;
+  const box = $('#tsbox');
+  if (!box || box.firstElementChild) return;
+  if (!window.turnstile) return setTimeout(mountTurnstile, 200);
+  tsId = window.turnstile.render(box, { sitekey: TURNSTILE_SITE, theme: 'dark' });
+}
+const tsToken = () => (tsId && window.turnstile) ? window.turnstile.getResponse(tsId) : '';
+const tsReset = () => { if (tsId && window.turnstile) window.turnstile.reset(tsId); };
 
 const chatShell = () => `<aside class="chat" aria-label="Table chat"><div class="log" id="chatlog"></div>
   <form id="chatform"><input type="text" id="chatin" maxlength="200" placeholder="Message the table" autocomplete="off" aria-label="Message"><button class="btn small">Send</button></form></aside>`;
@@ -169,6 +187,7 @@ const shells = {
       <label>Player name<input type="text" id="au" autocomplete="username" maxlength="16" required></label>
       <label>Password<input type="password" id="ap" required></label>
       <p class="err" id="autherr" role="alert"></p>
+      ${TURNSTILE_SITE ? '<div class="tsbox" id="tsbox"></div>' : ''}
       <button class="btn primary" id="authgo"></button>
       <p class="switch" id="authswitch"></p>
     </form></main>`,
@@ -220,6 +239,7 @@ function drawAuth() {
   $('#ap').autocomplete = reg ? 'new-password' : 'current-password';
   $('#authswitch').innerHTML = reg ? 'Already have an account? <button type="button" class="link" data-act="authmode">Log in</button>'
     : 'New here? <button type="button" class="link" data-act="authmode">Create an account</button>';
+  mountTurnstile();
 }
 
 // The two names on one side of a lobby table, e.g. "Mei and an open seat". Teammates sit side by side.
@@ -528,9 +548,11 @@ document.addEventListener('submit', async e => {
     const err = $('#autherr'), go = $('#authgo');
     err.textContent = ''; go.disabled = true;
     try {
-      const r = await api(S.authMode === 'register' ? 'register' : 'login', { username: $('#au').value, password: $('#ap').value });
+      // The token is single-use, so one is asked for at submit time and the widget is reset
+      // after any failure, solved or not: a token the server checked is spent.
+      const r = await api(S.authMode === 'register' ? 'register' : 'login', { username: $('#au').value, password: $('#ap').value, cfTurnstileResponse: tsToken() });
       S.me = r.user; S.closed = false; render(); connect();
-    } catch (x) { err.textContent = x.message; }
+    } catch (x) { err.textContent = x.message; tsReset(); }
     go.disabled = false;
   } else if (f.id === 'createform') {
     sendMsg({ t: 'create', name: $('#tn').value, mode: $('#tm').value, length: $('#tl').value, turnSec: +$('#tt').value, stake: $('#tm').value === 'team' ? $('#ts').value : 'none' });
